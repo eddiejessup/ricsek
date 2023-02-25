@@ -7,5 +7,27 @@ edition = "2021"
 
 [dependencies]
 ferris-says = "0.2"
-ndarray = "0.15.6"
+ndarray = { version = "0.15.6", features = ["serde"] }
 ndarray-rand = "0.14.0"
+diesel = { version = "2.0.0", features = [
+  "postgres",
+  "postgres_backend",
+  "serde_json",
+  "time",
+] }
+dotenvy = "0.15"
+json = "0.12.4"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = { version = "1.0.93" }
+time = "0.3.20"
+
+[[bin]]
+name = "initialize"
+doc = false
+
+[[bin]]
+name = "run"
+doc = false
+
+[lib]
+doc = false
