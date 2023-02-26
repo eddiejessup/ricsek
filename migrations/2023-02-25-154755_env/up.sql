@@ -1,9 +1,8 @@
 CREATE TABLE env (
     id SERIAL PRIMARY KEY,
     run_id INTEGER NOT NULL REFERENCES run(id),
-    step_view INTEGER NOT NULL,
-    step_sim INTEGER NOT NULL,
-    t_sim FLOAT NOT NULL
+    step INTEGER NOT NULL,
+    t FLOAT NOT NULL
 );
 
 CREATE TABLE agent (

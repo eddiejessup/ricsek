@@ -15,9 +15,8 @@ diesel::table! {
     env (id) {
         id -> Int4,
         run_id -> Int4,
-        step_view -> Int4,
-        step_sim -> Int4,
-        t_sim -> Float8,
+        step -> Int4,
+        t -> Float8,
     }
 }
 

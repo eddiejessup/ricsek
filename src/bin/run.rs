@@ -1,26 +1,30 @@
 use ndarray::prelude::*;
 use ndarray_rand::rand_distr::Normal;
 use ndarray_rand::RandomExt;
-use ricsek::runner::common::*;
+use ricsek::common::*;
 
 fn wrap(d: &mut Array2<f64>, l: f64) {
-  let l_half = l * 0.5;
-  d.mapv_inplace(|mut x| {
-      if x < -l_half {
-          x += l
-      } else if x > l_half {
-          x -= l
-      };
-      x
-  });
+    let l_half = l * 0.5;
+    d.mapv_inplace(|mut x| {
+        if x < -l_half {
+            x += l
+        } else if x > l_half {
+            x -= l
+        };
+        x
+    });
 }
 
-
-pub fn run(sim_params: SimParams, mut sim_state: SimState, run_params: RunParams) {
+pub fn run(
+    conn: &mut diesel::PgConnection,
+    sim_params: SimParams,
+    mut sim_state: SimState,
+    run_params: RunParams,
+) {
     let trans_diff_distr = Normal::new(0.0, sim_params.len_trans_diff()).unwrap();
     let rot_diff_distr = Normal::new(0.0, sim_params.len_rot_diff()).unwrap();
 
-    while sim_state.t_sim < run_params.t_sim_max {
+    while sim_state.t < run_params.t_max {
         // Compute environment and agent variables.
 
         // Update agent position.
@@ -55,22 +59,34 @@ pub fn run(sim_params: SimParams, mut sim_state: SimState, run_params: RunParams
         // (C). Update environment
 
         // Upate time and step.
-        sim_state.t_sim += sim_params.dt_sim;
-        sim_state.step_sim += 1
+        sim_state.t += sim_params.dt_sim;
+        sim_state.step += 1;
+
+        if sim_state.step % run_params.dstep_view == 0 {
+            println!("CHECKPOINT: step={}, t = {}", sim_state.step, sim_state.t);
+            ricsek::db::write_checkpoint(conn, run_params.run_id, &sim_state);
+        }
     }
 }
 
 fn main() {
-    let run_id = 1;
+    let run_id: usize = 1;
     let dt_view = 0.02;
     let dt_chk = 2.0;
-    // let run_params = RunParams {
-    //     t_sim_max: 5.0,
-    //     write_view: true,
-    //     dstep_view: sim_params.to_steps(dt_view),
-    //     write_chk: true,
-    //     dstep_chk: sim_params.to_steps(dt_chk),
-    //     run_id: run_id,
-    // };
 
+    let conn = &mut ricsek::db::establish_connection();
+
+    let (sim_params, sim_state) = ricsek::db::read_latest_checkpoint(conn, run_id);
+
+    let run_params = RunParams {
+        t_max: 5.0,
+        write_view: true,
+        dstep_view: sim_params.to_steps(dt_view),
+        write_chk: true,
+        dstep_chk: sim_params.to_steps(dt_chk),
+        run_id: run_id,
+    };
+
+    run(conn, sim_params, sim_state, run_params);
+    println!("Done!");
 }

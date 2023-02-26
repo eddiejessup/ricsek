@@ -1,21 +1,20 @@
 use ndarray::prelude::*;
 use ndarray::Zip;
 
-
 pub struct SimState {
     pub u_p: Array2<f64>,
     pub r: Array2<f64>,
-    pub t_sim: f64,
-    pub step_sim: usize,
+    pub t: f64,
+    pub step: usize,
 }
 
 impl SimState {
-  pub fn new(u_p: Array2<f64>, r: Array2<f64>) -> SimState {
+    pub fn new(u_p: Array2<f64>, r: Array2<f64>) -> SimState {
         SimState {
             u_p,
             r,
-            t_sim: 0.0,
-            step_sim: 0,
+            t: 0.0,
+            step: 0,
         }
     }
 }
@@ -56,7 +55,7 @@ impl SimParams {
 }
 
 pub struct RunParams {
-    pub t_sim_max: f64,
+    pub t_max: f64,
     pub write_view: bool,
     pub dstep_view: usize,
     pub write_chk: bool,
