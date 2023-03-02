@@ -70,21 +70,19 @@ pub fn run(
 }
 
 fn main() {
-    let run_id: usize = 1;
-    let dt_view = 0.02;
-    let dt_chk = 2.0;
+    let run_id: usize = 7;
+    let dt_view = 0.05;
+    let t_max = 1.0;
 
     let conn = &mut ricsek::db::establish_connection();
 
-    let (sim_params, sim_state) = ricsek::db::read_latest_checkpoint(conn, run_id);
+    let sim_params = ricsek::db::read_run(conn, run_id);
+    let sim_state = ricsek::db::read_latest_checkpoint(conn, run_id);
 
     let run_params = RunParams {
-        t_max: 5.0,
-        write_view: true,
+        t_max,
         dstep_view: sim_params.to_steps(dt_view),
-        write_chk: true,
-        dstep_chk: sim_params.to_steps(dt_chk),
-        run_id: run_id,
+        run_id,
     };
 
     run(conn, sim_params, sim_state, run_params);

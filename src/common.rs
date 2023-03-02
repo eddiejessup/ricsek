@@ -56,10 +56,7 @@ impl SimParams {
 
 pub struct RunParams {
     pub t_max: f64,
-    pub write_view: bool,
     pub dstep_view: usize,
-    pub write_chk: bool,
-    pub dstep_chk: usize,
     pub run_id: usize,
 }
 

@@ -5,7 +5,7 @@ use ricsek::common::*;
 
 fn main() {
     let sim_params = SimParams {
-        dt_sim: 0.1,
+        dt_sim: 0.01,
         l: 1.0,
         v_propulse: 0.1,
         segments: Array3::default((0, 2, 2)),
@@ -17,7 +17,7 @@ fn main() {
         ag_repulse_v_0: 1.0,
         d_trans_diff: 0.00002,
         d_rot_diff: 0.1,
-        n: 10,
+        n: 10000,
     };
 
     let r = Array::random(
@@ -42,4 +42,5 @@ fn main() {
 
     let run_id = ricsek::db::initialize_run(connection, &sim_params);
     ricsek::db::write_checkpoint(connection, run_id, &sim_state);
+    println!("Initialized run ID {}", run_id);
 }

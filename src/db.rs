@@ -2,8 +2,8 @@ use crate::common::*;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenvy::dotenv;
-use ndarray::Zip;
 use ndarray::prelude::*;
+use ndarray::Zip;
 use std::env;
 use time;
 
@@ -69,45 +69,59 @@ pub fn write_checkpoint(conn: &mut PgConnection, rid: usize, sim_state: &SimStat
     return eid;
 }
 
-pub fn read_latest_checkpoint(conn: &mut PgConnection, rid: usize) -> (SimParams, SimState) {
-    use schema::{agent::dsl::*, env::dsl::*, run::dsl::*};
-
+pub fn read_run(conn: &mut PgConnection, rid: usize) -> SimParams {
+    use schema::run::dsl::*;
     let sim_params_json = run
         .filter(schema::run::id.eq(rid as i32))
         .select(params)
         .get_result::<serde_json::Value>(conn)
         .unwrap();
+    return serde_json::from_value(sim_params_json).unwrap();
+}
 
-    let sim_params = serde_json::from_value(sim_params_json).unwrap();
-
-    let (step_val, t_val, latest_env_id) = env
+pub fn read_run_envs(conn: &mut PgConnection, rid: usize) -> Vec<models::Env> {
+    use schema::env::dsl::*;
+    return env
         .filter(run_id.eq(rid as i32))
-        .select((step, t, schema::env::id))
-        .order(step.desc())
-        .first::<(i32, f64, i32)>(conn)
+        .order(step.asc())
+        .load::<models::Env>(conn)
         .unwrap();
+}
 
-    let agent_vals: Vec<(f64, f64, f64, f64)> = agent
-        .filter(env_id.eq(latest_env_id))
-        .select((rx, ry, ux, uy))
+pub fn env_to_sim_state(conn: &mut PgConnection, env: &models::Env) -> SimState {
+    use schema::agent::dsl::*;
+
+    let agent_vals: Vec<models::Agent> = agent
+        .filter(env_id.eq(env.id))
         .order(agent_id.asc())
-        .get_results::<(f64, f64, f64, f64)>(conn)
+        .get_results::<models::Agent>(conn)
         .unwrap();
 
-    let rx_arr = Array1::from_iter(agent_vals.iter().map(|x| x.0));
-    let ry_arr = Array1::from_iter(agent_vals.iter().map(|x| x.1));
-    let ux_arr = Array1::from_iter(agent_vals.iter().map(|x| x.2));
-    let uy_arr = Array1::from_iter(agent_vals.iter().map(|x| x.3));
+    let rx_arr = Array1::from_iter(agent_vals.iter().map(|a| a.rx));
+    let ry_arr = Array1::from_iter(agent_vals.iter().map(|a| a.ry));
+    let ux_arr = Array1::from_iter(agent_vals.iter().map(|a| a.ux));
+    let uy_arr = Array1::from_iter(agent_vals.iter().map(|a| a.uy));
 
     let r = ndarray::stack(Axis(1), &[rx_arr.view(), ry_arr.view()]).unwrap();
     let u_p = ndarray::stack(Axis(1), &[ux_arr.view(), uy_arr.view()]).unwrap();
 
-    let sim_state = SimState {
-        step: step_val as usize,
-        t: t_val,
+    return SimState {
+        step: env.step as usize,
+        t: env.t,
         r,
         u_p,
     };
+}
 
-    return (sim_params, sim_state);
+pub fn read_run_sim_states(conn: &mut PgConnection, rid: usize) -> Vec<SimState> {
+    return read_run_envs(conn, rid)
+        .into_iter()
+        .map(|env| env_to_sim_state(conn, &env))
+        .collect();
+}
+
+pub fn read_latest_checkpoint(conn: &mut PgConnection, rid: usize) -> SimState {
+    let envs = read_run_envs(conn, rid);
+    let latest_env = envs.last().unwrap();
+    return env_to_sim_state(conn, latest_env);
 }

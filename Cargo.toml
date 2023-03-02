@@ -20,6 +20,7 @@ json = "0.12.4"
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93" }
 time = "0.3.20"
+bevy = "0.9.1"
 
 [[bin]]
 name = "initialize"
@@ -27,6 +28,10 @@ doc = false
 
 [[bin]]
 name = "run"
+doc = false
+
+[[bin]]
+name = "view"
 doc = false
 
 [lib]
