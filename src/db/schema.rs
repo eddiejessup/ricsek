@@ -32,8 +32,4 @@ diesel::table! {
 diesel::joinable!(agent -> env (env_id));
 diesel::joinable!(env -> run (run_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    agent,
-    env,
-    run,
-);
+diesel::allow_tables_to_appear_in_same_query!(agent, env, run,);

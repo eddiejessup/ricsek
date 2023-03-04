@@ -36,6 +36,7 @@ pub struct SimParams {
     pub l: f64,
     pub ag_f_propulse: f64,
     pub k_repulse: f64,
+    pub aspect_ratio: f64,
     pub ag_trans_mobility: f64,
     pub ag_rot_mobility: f64,
     pub d_trans_diff: f64,
@@ -72,6 +73,7 @@ pub struct SimParamsPhysical {
     // quantities.
     pub ag_f_propulse: f64,
     pub ag_dipole_strength: f64,
+    pub aspect_ratio: f64,
     pub temp: f64,
     pub ag_radius: f64,
     pub viscosity: f64,
@@ -80,35 +82,35 @@ pub struct SimParamsPhysical {
 
 impl SimParamsPhysical {
     fn stokes_trans_coeff(&self) -> f64 {
-        return 6.0 * PI * self.viscosity * self.ag_radius;
+        6.0 * PI * self.viscosity * self.ag_radius
     }
 
     fn stokes_rot_coeff(&self) -> f64 {
-        return 8.0 * PI * self.viscosity * self.ag_radius.powi(3);
+        8.0 * PI * self.viscosity * self.ag_radius.powi(3)
     }
 
     fn stokes_trans_mobility(&self) -> f64 {
         // F = 6πηav
-        return 1.0 / self.stokes_trans_coeff();
+        1.0 / self.stokes_trans_coeff()
     }
 
     fn stokes_rot_mobility(&self) -> f64 {
         // T = 8πηa^3ω
-        return 1.0 / self.stokes_rot_coeff();
+        1.0 / self.stokes_rot_coeff()
     }
 
     fn thermal_energy(&self) -> f64 {
-        return physical_constants::BOLTZMANN_CONSTANT * self.temp;
+        physical_constants::BOLTZMANN_CONSTANT * self.temp
     }
 
     fn stokes_d_trans(&self) -> f64 {
         // D = kBT / 6πηa
-        return self.thermal_energy() / self.stokes_trans_coeff();
+        self.thermal_energy() / self.stokes_trans_coeff()
     }
 
     fn stokes_d_rot(&self) -> f64 {
         // Drot = kBT / 8πηa^3
-        return self.thermal_energy() / self.stokes_rot_coeff();
+        self.thermal_energy() / self.stokes_rot_coeff()
     }
 
     pub fn as_params(&self) -> SimParams {
@@ -123,18 +125,18 @@ impl SimParamsPhysical {
         // m / s
         // speed! good.
         let k_repulse = 3.0 * self.ag_dipole_strength / (64.0 * PI * self.viscosity);
-
-        return SimParams {
+        SimParams {
             dt: self.dt,
             l: self.l,
             n: self.n,
             ag_f_propulse: self.ag_f_propulse,
             k_repulse,
+            aspect_ratio: self.aspect_ratio,
             ag_trans_mobility: self.stokes_trans_mobility(),
             ag_rot_mobility: self.stokes_rot_mobility(),
             d_trans_diff: self.stokes_d_trans(),
             d_rot_diff: self.stokes_d_rot(),
-        };
+        }
     }
 }
 
@@ -151,7 +153,7 @@ pub struct Point {
 
 impl Point {
     pub fn asarray(&self) -> Array1<f64> {
-        return array![self.x, self.y];
+        array![self.x, self.y]
     }
 }
 
@@ -159,6 +161,10 @@ impl Point {
 pub struct LineSegment {
     pub p1: Point,
     pub p2: Point,
+}
+
+pub fn array_angle_to_x(v: ArrayView1<f64>) -> f64 {
+    v[1].atan2(v[0])
 }
 
 impl LineSegment {
@@ -176,7 +182,7 @@ impl LineSegment {
 
     pub fn angle_to_x(&self) -> f64 {
         let v = self.as_vector();
-        v[1].atan2(v[0])
+        array_angle_to_x(v.view())
     }
 
     pub fn length(&self) -> f64 {

@@ -18,12 +18,13 @@ fn wrap(d: &mut Array2<f64>, l: f64) {
     });
 }
 
-fn segment_repulsion_v_1(
+fn segment_repulsion_1(
     r: ArrayView1<f64>,
     u: ArrayView1<f64>,
     segment: &LineSegment,
     k: f64,
-) -> Array1<f64> {
+    aspect_ratio: f64,
+) -> (Array1<f64>, f64) {
     // https://arxiv.org/pdf/0806.2898.pdf
     // The velocity component of the swimmer towards the segment:
     //   v_y(θ, y) = (−3p / 64πηy^2) * (1 − 3 cos^2(θ)).
@@ -56,21 +57,32 @@ fn segment_repulsion_v_1(
     // The velocity.
     let v = -(k / y.powi(2)) * (1.0 - 3.0 * cos_th.powi(2));
     // println!("v: {:?}", 1e6 * &v);
-    return v * &y_vec_unit;
+
+    let ar_factor = (aspect_ratio.powi(2) - 1.0) / (2.0 * (aspect_ratio.powi(2) + 1.0));
+    // println!("ar_factor: {:?}", &ar_factor);
+    let sin_th = (1.0 - cos_th.powi(2)).sqrt();
+    // println!("sin_th: {:?}", &sin_th);
+    let om = (-k * cos_th * sin_th / y.powi(3)) * (1.0 + ar_factor * (1.0 + cos_th.powi(2)));
+    // println!("om: {:?} degrees/s", &om.to_degrees());
+
+    (v * &y_vec_unit, om)
 }
 
-fn segment_repulsion_v_n(
+fn segment_repulsion_n(
     r: ArrayView2<f64>,
     u: ArrayView2<f64>,
     segment: &LineSegment,
     k: f64,
-) -> Array2<f64> {
-    let mut f = Array::zeros((r.nrows(), 2));
+    aspect_ratio: f64,
+) -> (Array2<f64>, Array1<f64>) {
+    let mut v = Array::zeros((r.nrows(), 2));
+    let mut om: Array1<f64> = Array::zeros(r.nrows());
     for i in 0..r.nrows() {
-        f.row_mut(i)
-            .assign(&segment_repulsion_v_1(r.row(i), u.row(i), segment, k));
+        let (v_i, om_i) = segment_repulsion_1(r.row(i), u.row(i), segment, k, aspect_ratio);
+        v.row_mut(i).assign(&v_i);
+        om[i] = om_i;
     }
-    f
+    (v, om)
 }
 
 pub fn run(
@@ -86,11 +98,16 @@ pub fn run(
     while sim_state.t < run_params.t_max {
         // Compute environment and agent variables.
 
-        // Update agent position.
+        // Initial agent position and orientation changes.
         let mut dr = Array::zeros((sim_params.n, 2));
-        // Compute propulsion translation.
-        // Overall agent velocity.
+        let mut dth = Array::zeros(sim_params.n);
+
+        // Initialise memoryless properties.
+        //   - Agent velocity.
         let mut v = Array::zeros((sim_params.n, 2));
+        //   - Agent rotation rate.
+        let mut om = Array::zeros(sim_params.n);
+
         // Agent propulsion.
         v.scaled_add(
             sim_params.ag_f_propulse * sim_params.ag_trans_mobility,
@@ -99,12 +116,15 @@ pub fn run(
 
         // Update position due to segment-agent repulsion.
         for segment in &segments {
-            v += &segment_repulsion_v_n(
+            let (v_seg, om_seg) = &segment_repulsion_n(
                 sim_state.r.view(),
                 sim_state.u_p.view(),
-                &segment,
+                segment,
                 sim_params.k_repulse,
+                sim_params.aspect_ratio,
             );
+            v += v_seg;
+            om += om_seg;
         }
         // Update agent position from velocity.
         dr.scaled_add(sim_params.dt, &v);
@@ -116,15 +136,9 @@ pub fn run(
         // Apply periodic boundary condition.
         wrap(&mut (sim_state.r), sim_params.l);
 
-        // Update agent direction.
-        let mut dth = Array::zeros(sim_params.n);
+        dth.scaled_add(sim_params.dt, &om);
         // Compute rotational diffusion rotation.
         dth += &Array::random((sim_params.n,), rot_diff_distr);
-
-        // Compute torque rotation.
-        let torque = Array::zeros(sim_params.n);
-        dth.scaled_add(sim_params.dt * sim_params.ag_rot_mobility, &torque);
-
         // Perform the rotation.
         rotate_2d_vecs_inplace(&mut sim_state.u_p.view_mut(), dth.view());
 
@@ -142,8 +156,8 @@ pub fn run(
 }
 
 fn main() {
-    let dt_view = 0.08;
-    let t_max = 40.0;
+    let dt_view = 0.02;
+    let t_max = 10.0;
 
     let conn = &mut ricsek::db::establish_connection();
 

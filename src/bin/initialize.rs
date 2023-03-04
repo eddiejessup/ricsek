@@ -18,9 +18,11 @@ fn main() {
         viscosity: 0.001,
         ag_f_propulse: 0.5e-12,
         ag_dipole_strength: 0.5e-18,
+        aspect_ratio: 2.0,
         ag_radius: 1e-6,
         n: 100,
-        temp: 300.0,
+        // temp: 300.0,
+        temp: 0.0,
     };
     let sim_params = sim_params_phys.as_params();
     println!(

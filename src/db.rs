@@ -29,13 +29,13 @@ pub fn initialize_run(
         .values((
             None::<Eq<id, i32>>,
             None::<Eq<created_at, time::OffsetDateTime>>,
-            params.eq(serde_json::to_value(&sim_params).unwrap()),
-            segments.eq(serde_json::to_value(&segment_vals).unwrap()),
+            params.eq(serde_json::to_value(sim_params).unwrap()),
+            segments.eq(serde_json::to_value(segment_vals).unwrap()),
         ))
         .returning(id)
         .get_result(conn)
         .unwrap();
-    return run_id as usize;
+    run_id as usize
 }
 
 pub fn write_checkpoint(conn: &mut PgConnection, rid: usize, sim_state: &SimState) -> i32 {
@@ -71,13 +71,13 @@ pub fn write_checkpoint(conn: &mut PgConnection, rid: usize, sim_state: &SimStat
         .values(rows)
         .execute(conn)
         .unwrap();
-    return eid;
+    eid
 }
 
 pub fn read_latest_run_id(conn: &mut PgConnection) -> usize {
     use schema::run::dsl::*;
     let rid: i32 = run.order(created_at.desc()).select(id).first(conn).unwrap();
-    return rid as usize;
+    rid as usize
 }
 
 pub fn read_run(conn: &mut PgConnection, rid: usize) -> SimSetup {
@@ -89,19 +89,18 @@ pub fn read_run(conn: &mut PgConnection, rid: usize) -> SimSetup {
         .unwrap();
     let params_val = serde_json::from_value(sim_params_json).unwrap();
     let segments_val = serde_json::from_value(sim_segments_json).unwrap();
-    return SimSetup {
+    SimSetup {
         params: params_val,
         segments: segments_val,
-    };
+    }
 }
 
 pub fn read_run_envs(conn: &mut PgConnection, rid: usize) -> Vec<models::Env> {
     use schema::env::dsl::*;
-    return env
-        .filter(run_id.eq(rid as i32))
+    env.filter(run_id.eq(rid as i32))
         .order(step.asc())
         .load::<models::Env>(conn)
-        .unwrap();
+        .unwrap()
 }
 
 pub fn env_to_sim_state(conn: &mut PgConnection, env: &models::Env) -> SimState {
@@ -121,23 +120,23 @@ pub fn env_to_sim_state(conn: &mut PgConnection, env: &models::Env) -> SimState 
     let r = ndarray::stack(Axis(1), &[rx_arr.view(), ry_arr.view()]).unwrap();
     let u_p = ndarray::stack(Axis(1), &[ux_arr.view(), uy_arr.view()]).unwrap();
 
-    return SimState {
+    SimState {
         step: env.step as usize,
         t: env.t,
         r,
         u_p,
-    };
+    }
 }
 
 pub fn read_run_sim_states(conn: &mut PgConnection, rid: usize) -> Vec<SimState> {
-    return read_run_envs(conn, rid)
+    read_run_envs(conn, rid)
         .into_iter()
         .map(|env| env_to_sim_state(conn, &env))
-        .collect();
+        .collect()
 }
 
 pub fn read_latest_checkpoint(conn: &mut PgConnection, rid: usize) -> SimState {
     let envs = read_run_envs(conn, rid);
     let latest_env = envs.last().unwrap();
-    return env_to_sim_state(conn, latest_env);
+    env_to_sim_state(conn, latest_env)
 }
