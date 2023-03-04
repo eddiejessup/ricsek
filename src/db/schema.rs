@@ -25,6 +25,7 @@ diesel::table! {
         id -> Int4,
         created_at -> Timestamptz,
         params -> Jsonb,
+        segments -> Jsonb,
     }
 }
 

@@ -1,0 +1,138 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'ricsek'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=ricsek"
+        ],
+        "filter": {
+          "name": "ricsek",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'initialize'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=initialize",
+          "--package=ricsek"
+        ],
+        "filter": {
+          "name": "initialize",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'initialize'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=initialize",
+          "--package=ricsek"
+        ],
+        "filter": {
+          "name": "initialize",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'run'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=run",
+          "--package=ricsek"
+        ],
+        "filter": {
+          "name": "run",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'run'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=run",
+          "--package=ricsek"
+        ],
+        "filter": {
+          "name": "run",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'view'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=view",
+          "--package=ricsek"
+        ],
+        "filter": {
+          "name": "view",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'view'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=view",
+          "--package=ricsek"
+        ],
+        "filter": {
+          "name": "view",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

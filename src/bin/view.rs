@@ -21,7 +21,7 @@ struct ViewState {
 struct SimStates(Vec<SimState>);
 
 #[derive(Resource)]
-struct SimParamsRes(SimParams);
+struct SimSetupRes(SimSetup);
 
 fn transform_coord(sd: f64, sl: f64) -> f32 {
     return (PL * sd / sl) as f32;
@@ -30,7 +30,7 @@ fn transform_coord(sd: f64, sl: f64) -> f32 {
 fn add_agents(
     mut commands: Commands,
     sim_states: Res<SimStates>,
-    sim_params: Res<SimParamsRes>,
+    sim_setup: Res<SimSetupRes>,
     view_state: Res<ViewState>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -40,7 +40,9 @@ fn add_agents(
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
 
-    let l = sim_params.0.l;
+    let sim_setup1 = &sim_setup.0;
+
+    let l = sim_setup1.params.l;
 
     for (i, r) in cur_sim_state.r.view().rows().into_iter().enumerate() {
         let pr_x = transform_coord(r[0], l);
@@ -56,17 +58,41 @@ fn add_agents(
             Agent(i),
         ));
     }
+
+    for seg in (&(sim_setup1.segments)).into_iter() {
+        let centre = seg.centre();
+        let width_render = 2.0;
+
+        let rect_shape = Vec2 {
+            x: transform_coord(seg.length(), l),
+            y: width_render,
+        };
+
+        let transform = Transform::IDENTITY.with_translation(Vec3::new(
+            transform_coord(centre.x, l),
+            transform_coord(centre.y, l),
+            0.0,
+        ))
+        .with_rotation(Quat::from_rotation_z(seg.angle_to_x() as f32));
+
+        commands.spawn((MaterialMesh2dBundle {
+            mesh: meshes.add(shape::Quad::new(rect_shape).into()).into(),
+            material: materials.add(ColorMaterial::from(Color::YELLOW)),
+            transform,
+            ..default()
+        },));
+    }
 }
 
 fn update_agent_position(
     sim_states: Res<SimStates>,
-    sim_params: Res<SimParamsRes>,
+    sim_setup: Res<SimSetupRes>,
     mut view_state: ResMut<ViewState>,
     mut query: Query<(&mut Transform, &Agent)>,
 ) {
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
-    let l = sim_params.0.l;
+    let l = sim_setup.0.params.l;
 
     match view_state.last_update_i {
         Some(last_update_i) => {
@@ -89,18 +115,18 @@ fn change_view(
     sim_states: Res<SimStates>,
     mut view_state: ResMut<ViewState>,
 ) {
-  let mut i = view_state.i;
+    let mut i = view_state.i;
     if keyboard_input.pressed(KeyCode::Left) && i > 0 {
-      println!("Handling left");
-      i -= 1;
+        println!("Handling left");
+        i -= 1;
     }
 
     if keyboard_input.pressed(KeyCode::Right) {
-      println!("Handling right, {}", sim_states.0.len() - 1);
+        println!("Handling right, {}", sim_states.0.len() - 1);
         i += 1;
         i = i.min(sim_states.0.len() - 1);
         println!("Now {}", i);
-      }
+    }
 
     if i != view_state.i {
         println!("Changing view to i: {}", i);
@@ -110,11 +136,10 @@ fn change_view(
 }
 
 fn main() {
-    let run_id: usize = 6;
-
     let conn = &mut ricsek::db::establish_connection();
 
-    let sim_params = ricsek::db::read_run(conn, run_id);
+    let run_id = ricsek::db::read_latest_run_id(conn);
+    let sim_setup = ricsek::db::read_run(conn, run_id);
     let sim_states = ricsek::db::read_run_sim_states(conn, run_id);
 
     println!("Got {} sim-states", sim_states.len());
@@ -122,16 +147,18 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .insert_resource(SimStates(sim_states))
-        .insert_resource(SimParamsRes(sim_params))
-        .insert_resource(ViewState { i: 0, last_update_i: None })
-
+        .insert_resource(SimSetupRes(sim_setup))
+        .insert_resource(ViewState {
+            i: 0,
+            last_update_i: None,
+        })
         .add_startup_system(add_agents)
         .add_system_set(
-          SystemSet::new()
-              .with_run_criteria(bevy::time::FixedTimestep::step(TIME_STEP))
-              .with_system(update_agent_position)
-              .with_system(change_view)
-      )
+            SystemSet::new()
+                .with_run_criteria(bevy::time::FixedTimestep::step(TIME_STEP))
+                .with_system(update_agent_position)
+                .with_system(change_view),
+        )
         .add_system(bevy::window::close_on_esc)
         .run();
 

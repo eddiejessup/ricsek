@@ -18,7 +18,11 @@ pub fn establish_connection() -> PgConnection {
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }
 
-pub fn initialize_run(conn: &mut PgConnection, sim_params: &SimParams) -> usize {
+pub fn initialize_run(
+    conn: &mut PgConnection,
+    sim_params: &SimParams,
+    segment_vals: &Vec<LineSegment>,
+) -> usize {
     use crate::db::schema::run::dsl::*;
     use diesel::dsl::Eq;
     let run_id: i32 = diesel::insert_into(crate::db::schema::run::table)
@@ -26,6 +30,7 @@ pub fn initialize_run(conn: &mut PgConnection, sim_params: &SimParams) -> usize 
             None::<Eq<id, i32>>,
             None::<Eq<created_at, time::OffsetDateTime>>,
             params.eq(serde_json::to_value(&sim_params).unwrap()),
+            segments.eq(serde_json::to_value(&segment_vals).unwrap()),
         ))
         .returning(id)
         .get_result(conn)
@@ -69,14 +74,25 @@ pub fn write_checkpoint(conn: &mut PgConnection, rid: usize, sim_state: &SimStat
     return eid;
 }
 
-pub fn read_run(conn: &mut PgConnection, rid: usize) -> SimParams {
+pub fn read_latest_run_id(conn: &mut PgConnection) -> usize {
     use schema::run::dsl::*;
-    let sim_params_json = run
+    let rid: i32 = run.order(created_at.desc()).select(id).first(conn).unwrap();
+    return rid as usize;
+}
+
+pub fn read_run(conn: &mut PgConnection, rid: usize) -> SimSetup {
+    use schema::run::dsl::*;
+    let (sim_params_json, sim_segments_json) = run
         .filter(schema::run::id.eq(rid as i32))
-        .select(params)
-        .get_result::<serde_json::Value>(conn)
+        .select((params, segments))
+        .get_result::<(serde_json::Value, serde_json::Value)>(conn)
         .unwrap();
-    return serde_json::from_value(sim_params_json).unwrap();
+    let params_val = serde_json::from_value(sim_params_json).unwrap();
+    let segments_val = serde_json::from_value(sim_segments_json).unwrap();
+    return SimSetup {
+        params: params_val,
+        segments: segments_val,
+    };
 }
 
 pub fn read_run_envs(conn: &mut PgConnection, rid: usize) -> Vec<models::Env> {
