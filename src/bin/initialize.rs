@@ -1,13 +1,12 @@
-use ndarray::prelude::*;
-use ndarray_rand::rand_distr::Uniform;
-use ndarray_rand::RandomExt;
+use rand::distributions::Uniform;
+use rand_distr::Distribution;
 use ricsek::common::params::SimParamsPhysical;
 use ricsek::common::*;
-use ricsek::math::{rotate_2d_vecs_inplace, LineSegment, Point};
+use ricsek::math::{rotate_point_inplace, random_point};
 
-const PLANE_SEGMENTS: [LineSegment; 1] = [LineSegment {
-    p1: Point { x: 0.0, y: -50e-6 },
-    p2: Point { x: 0.0, y: 50e-6 },
+const PLANE_SEGMENTS: [geo::Line; 1] = [geo::Line {
+    start: geo::coord! {x: 0.0, y: -50e-6},
+    end: geo::coord! {x: 0.0, y: 50e-6},
 }];
 
 fn main() {
@@ -71,23 +70,22 @@ Computed derived parameters (for info only):
         l_cross = sim_params.l / sim_params.force_to_velocity(sim_params.ag_f_propulse),
     );
 
-    let r = Array::random(
-        (sim_params.n, 2),
-        Uniform::new(-sim_params.l * 0.5, sim_params.l * 0.5),
-    );
+    let mut rng = rand::thread_rng();
+    let r_distr = Uniform::new(-sim_params.l * 0.5, sim_params.l * 0.5);
+    let th_distr = Uniform::new(-std::f64::consts::PI, std::f64::consts::PI);
+    let agents = (0..sim_params.n)
+        .map(|_i| {
+            let th = th_distr.sample(&mut rng);
+            let mut u = [0.0, 1.0].into();
+            rotate_point_inplace(&mut u, th);
+            Agent {
+                r: random_point(&mut rng, r_distr),
+                u,
+            }
+        })
+        .collect();
 
-    let mut u_p = Array::<f64, Ix2>::zeros((sim_params.n, 2));
-    u_p.slice_mut(s![.., 0]).fill(1.0);
-    rotate_2d_vecs_inplace(
-        &mut u_p.view_mut(),
-        Array::random(
-            sim_params.n,
-            Uniform::new(-std::f64::consts::PI, std::f64::consts::PI),
-        )
-        .view(),
-    );
-
-    let sim_state = SimState::new(u_p, r);
+    let sim_state = SimState::new(agents);
 
     let connection = &mut ricsek::db::establish_connection();
 

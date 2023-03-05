@@ -1,11 +1,8 @@
-use crate::common::*;
 use crate::common::params::*;
-use crate::math::*;
+use crate::common::*;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenvy::dotenv;
-use ndarray::prelude::*;
-use ndarray::Zip;
 use std::env;
 use time;
 
@@ -23,7 +20,7 @@ pub fn establish_connection() -> PgConnection {
 pub fn initialize_run(
     conn: &mut PgConnection,
     sim_params: &SimParams,
-    segment_vals: &Vec<LineSegment>,
+    segment_vals: &Vec<geo::Line>,
 ) -> usize {
     use crate::db::schema::run::dsl::*;
     use diesel::dsl::Eq;
@@ -55,19 +52,21 @@ pub fn write_checkpoint(conn: &mut PgConnection, rid: usize, sim_state: &SimStat
         .unwrap();
 
     use crate::db::schema::agent::dsl::*;
-    let rows = Zip::indexed(sim_state.r.view().rows())
-        .and(sim_state.u_p.view().rows())
-        .map_collect(|aid, r, u_p| {
+    let rows: Vec<_> = sim_state
+        .agents
+        .iter()
+        .enumerate()
+        .map(|(aid, a)| {
             (
                 agent_id.eq(aid as i32),
                 env_id.eq(eid),
-                rx.eq(r[0]),
-                ry.eq(r[1]),
-                ux.eq(u_p[0]),
-                uy.eq(u_p[1]),
+                rx.eq(a.r.x()),
+                ry.eq(a.r.y()),
+                ux.eq(a.u.x()),
+                uy.eq(a.u.y()),
             )
         })
-        .into_raw_vec();
+        .collect();
 
     diesel::insert_into(agent)
         .values(rows)
@@ -84,16 +83,13 @@ pub fn read_latest_run_id(conn: &mut PgConnection) -> usize {
 
 pub fn read_run(conn: &mut PgConnection, rid: usize) -> SimSetup {
     use schema::run::dsl::*;
-    let (sim_params_json, sim_segments_json) = run
+    let v = run
         .filter(schema::run::id.eq(rid as i32))
-        .select((params, segments))
-        .get_result::<(serde_json::Value, serde_json::Value)>(conn)
+        .get_result::<models::Run>(conn)
         .unwrap();
-    let params_val = serde_json::from_value(sim_params_json).unwrap();
-    let segments_val = serde_json::from_value(sim_segments_json).unwrap();
     SimSetup {
-        params: params_val,
-        segments: segments_val,
+        params: serde_json::from_value(v.params).unwrap(),
+        segments: serde_json::from_value(v.segments).unwrap(),
     }
 }
 
@@ -114,19 +110,18 @@ pub fn env_to_sim_state(conn: &mut PgConnection, env: &models::Env) -> SimState 
         .get_results::<models::Agent>(conn)
         .unwrap();
 
-    let rx_arr = Array1::from_iter(agent_vals.iter().map(|a| a.rx));
-    let ry_arr = Array1::from_iter(agent_vals.iter().map(|a| a.ry));
-    let ux_arr = Array1::from_iter(agent_vals.iter().map(|a| a.ux));
-    let uy_arr = Array1::from_iter(agent_vals.iter().map(|a| a.uy));
-
-    let r = ndarray::stack(Axis(1), &[rx_arr.view(), ry_arr.view()]).unwrap();
-    let u_p = ndarray::stack(Axis(1), &[ux_arr.view(), uy_arr.view()]).unwrap();
+    let agents: Vec<Agent> = agent_vals
+        .iter()
+        .map(|a| Agent {
+            r: (a.rx, a.ry).into(),
+            u: (a.ux, a.uy).into(),
+        })
+        .collect();
 
     SimState {
         step: env.step as usize,
         t: env.t,
-        r,
-        u_p,
+        agents,
     }
 }
 

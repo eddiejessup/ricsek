@@ -1,7 +1,5 @@
 use std::f64::consts::PI;
 
-use crate::math::*;
-
 pub struct SimParamsPhysical {
     pub dt: f64,
     pub l: f64,
@@ -106,7 +104,7 @@ impl SimParams {
 
 pub struct SimSetup {
     pub params: SimParams,
-    pub segments: Vec<LineSegment>,
+    pub segments: Vec<geo::Line>,
 }
 
 pub struct RunParams {

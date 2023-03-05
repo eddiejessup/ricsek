@@ -1,66 +1,62 @@
-use ndarray::prelude::*;
-use ricsek::common::*;
+use rand_distr::Distribution;
 use ricsek::common::params::{RunParams, SimParams};
-use ricsek::dynamics::segment::n_agent_n_segments_kinematics;
+use ricsek::common::*;
 use ricsek::dynamics::boundary::wrap;
-use ricsek::dynamics::brownian::{trans_brownian_noise, rot_brownian_noise, trans_brownian_distr, rot_brownian_distr};
-use ricsek::math::{LineSegment, rotate_2d_vecs_inplace};
+use ricsek::dynamics::brownian::{rot_brownian_distr, trans_brownian_distr};
+use ricsek::dynamics::segment::agent_segments_kinematics;
+use ricsek::math::{random_point, rotate_point_inplace};
 
 pub fn run(
     conn: &mut diesel::PgConnection,
     sim_params: SimParams,
-    segments: Vec<LineSegment>,
+    segments: Vec<geo::Line>,
     mut sim_state: SimState,
     run_params: RunParams,
 ) {
     let trans_diff_distr = trans_brownian_distr(sim_params.d_trans_diff, sim_params.dt);
     let rot_diff_distr = rot_brownian_distr(sim_params.d_rot_diff, sim_params.dt);
 
+    let rng = &mut rand::thread_rng();
+
     while sim_state.t < run_params.t_max {
         // Compute environment and agent variables.
 
-        // Initial agent position and orientation changes.
-        let mut dr = Array::zeros((sim_params.n, 2));
-        let mut dth = Array::zeros(sim_params.n);
+        sim_state.agents.iter_mut().for_each(|agent| {
+            let mut dth: f64 = 0.0;
 
-        // Initialise memoryless properties.
-        //   - Agent velocity.
-        let mut v = Array::zeros((sim_params.n, 2));
-        //   - Agent rotation rate.
-        let mut om = Array::zeros(sim_params.n);
+            // Initialise memoryless properties.
+            //   - Agent velocity.
+            let mut v: geo::Point = (0.0, 0.0).into();
+            //   - Agent rotation rate.
+            let mut om: f64 = 0.0;
 
-        // Agent propulsion.
-        v.scaled_add(
-            sim_params.ag_f_propulse * sim_params.ag_trans_mobility,
-            &sim_state.u_p,
-        );
-        // Segment-agent velocity and rotation.
-        let (v_seg, om_seg) = n_agent_n_segments_kinematics(
-            sim_state.r.view(),
-            sim_state.u_p.view(),
-            &segments,
-            sim_params.k_repulse,
-            sim_params.aspect_ratio,
-        );
-        v += &v_seg;
-        om += &om_seg;
+            // Agent propulsion.
+            v += agent.u * sim_params.ag_trans_mobility * sim_params.ag_f_propulse;
 
-        // Update agent position from velocity.
-        dr.scaled_add(sim_params.dt, &v);
-        // Compute translational diffusion translation.
-        dr += &trans_brownian_noise(sim_params.n, trans_diff_distr);
-        // Perform the translation.
-        sim_state.r += &dr;
-        // Apply periodic boundary condition.
-        wrap(&mut sim_state.r, sim_params.l);
+            // Segment-agent velocity and rotation.
+            let (v_seg, om_seg) = agent_segments_kinematics(
+                agent,
+                &segments,
+                sim_params.k_repulse,
+                sim_params.aspect_ratio,
+            );
+            v += v_seg;
+            om += om_seg;
 
-        dth.scaled_add(sim_params.dt, &om);
-        // Compute rotational diffusion rotation.
-        dth += &rot_brownian_noise(sim_params.n, rot_diff_distr);
-        // Perform the rotation.
-        rotate_2d_vecs_inplace(&mut sim_state.u_p.view_mut(), dth.view());
+            // Update agent position from velocity.
+            agent.r += v * sim_params.dt;
+            // Compute translational diffusion translation.
+            agent.r += random_point(rng, trans_diff_distr);
 
-        // (C). Update environment
+            // Apply periodic boundary condition.
+            wrap(&mut agent.r, sim_params.l);
+
+            dth += om * sim_params.dt;
+            // Compute rotational diffusion rotation.
+            dth += &rot_diff_distr.sample(rng);
+            // Perform the rotation.
+            rotate_point_inplace(&mut agent.u, dth);
+        });
 
         // Upate time and step.
         sim_state.t += sim_params.dt;

@@ -3,37 +3,29 @@ name = "ricsek"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-ferris-says = "0.2"
-ndarray = { version = "0.15.6", features = ["serde"] }
-ndarray-rand = "0.14.0"
-diesel = { version = "2.0.0", features = [
+geo = { version = "0.23.*", features = ["use-serde"] }
+diesel = { version = "2.0.*", features = [
   "postgres",
   "postgres_backend",
   "serde_json",
   "time",
 ] }
-dotenvy = "0.15"
-json = "0.12.4"
-serde = { version = "1.0.152", features = ["derive"] }
-serde_json = { version = "1.0.93" }
-time = "0.3.20"
-bevy = "0.9.1"
-physical_constants = "0.5.0"
+dotenvy = "0.15.*"
+json = "0.12.*"
+serde = { version = "1.0.*", features = ["derive"] }
+serde_json = { version = "1.0.*" }
+time = "0.3.*"
+bevy = "0.9.*"
+physical_constants = "0.5.*"
+rand = "0.8.*"
+rand_distr = "0.4.*"
 
 [[bin]]
 name = "initialize"
-doc = false
 
 [[bin]]
 name = "run"
-doc = false
 
 [[bin]]
 name = "view"
-doc = false
-
-[lib]
-doc = false

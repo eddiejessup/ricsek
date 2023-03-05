@@ -1,19 +1,20 @@
-use ndarray::prelude::*;
-
 pub mod params;
 
+pub struct Agent {
+    pub r: geo::Point,
+    pub u: geo::Point,
+}
+
 pub struct SimState {
-    pub u_p: Array2<f64>,
-    pub r: Array2<f64>,
+    pub agents: Vec<Agent>,
     pub t: f64,
     pub step: usize,
 }
 
 impl SimState {
-    pub fn new(u_p: Array2<f64>, r: Array2<f64>) -> SimState {
+    pub fn new(agents: Vec<Agent>) -> SimState {
         SimState {
-            u_p,
-            r,
+            agents,
             t: 0.0,
             step: 0,
         }
