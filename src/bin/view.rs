@@ -1,6 +1,6 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 use ndarray::Zip;
-use ricsek::common::*;
+use ricsek::{common::{*, params::SimSetup}, math::array_angle_to_x};
 
 const PL: f64 = 1000.0;
 

@@ -1,7 +1,9 @@
 use ndarray::prelude::*;
 use ndarray_rand::rand_distr::Uniform;
 use ndarray_rand::RandomExt;
+use ricsek::common::params::SimParamsPhysical;
 use ricsek::common::*;
+use ricsek::math::{rotate_2d_vecs_inplace, LineSegment, Point};
 
 const PLANE_SEGMENTS: [LineSegment; 1] = [LineSegment {
     p1: Point { x: 0.0, y: -50e-6 },
