@@ -1,15 +1,16 @@
 use rand_distr::Distribution;
-use ricsek::common::params::{RunParams, SimParams};
-use ricsek::common::*;
+use ricsek::math::capsule::Capsule;
+use ricsek::parameters::{RunParams, simulation::SimParams};
+use ricsek::state::*;
 use ricsek::dynamics::boundary::wrap;
 use ricsek::dynamics::brownian::{rot_brownian_distr, trans_brownian_distr};
-use ricsek::dynamics::segment::agent_segments_kinematics;
-use ricsek::math::{random_point, rotate_point_inplace};
+use ricsek::dynamics::obstacle::agent_obstacles_kinematics;
+use ricsek::math::{random_coord, rotate_point_inplace};
 
 pub fn run(
     conn: &mut diesel::PgConnection,
     sim_params: SimParams,
-    segments: Vec<geo::Line>,
+    capsules: Vec<Capsule>,
     mut sim_state: SimState,
     run_params: RunParams,
 ) {
@@ -19,39 +20,30 @@ pub fn run(
     let rng = &mut rand::thread_rng();
 
     while sim_state.t < run_params.t_max {
-        // Compute environment and agent variables.
-
         sim_state.agents.iter_mut().for_each(|agent| {
-            let mut dth: f64 = 0.0;
-
-            // Initialise memoryless properties.
-            //   - Agent velocity.
-            let mut v: geo::Point = (0.0, 0.0).into();
-            //   - Agent rotation rate.
-            let mut om: f64 = 0.0;
+            // Fluid velocity and rotation.
+            // Segment-agent velocity and rotation.
+            let (mut v, om) = agent_obstacles_kinematics(
+                agent,
+                &capsules,
+                sim_params.ag_radius,
+                sim_params.aspect_ratio,
+                sim_params.k_repulse,
+                sim_params.seg_v_overlap_coeff,
+            );
 
             // Agent propulsion.
-            v += agent.u * sim_params.ag_trans_mobility * sim_params.ag_f_propulse;
-
-            // Segment-agent velocity and rotation.
-            let (v_seg, om_seg) = agent_segments_kinematics(
-                agent,
-                &segments,
-                sim_params.k_repulse,
-                sim_params.aspect_ratio,
-            );
-            v += v_seg;
-            om += om_seg;
+            v += agent.u * sim_params.ag_v_propulse;
 
             // Update agent position from velocity.
             agent.r += v * sim_params.dt;
             // Compute translational diffusion translation.
-            agent.r += random_point(rng, trans_diff_distr);
+            agent.r += random_coord(rng, trans_diff_distr).into();
 
             // Apply periodic boundary condition.
             wrap(&mut agent.r, sim_params.l);
 
-            dth += om * sim_params.dt;
+            let mut dth = om * sim_params.dt;
             // Compute rotational diffusion rotation.
             dth += &rot_diff_distr.sample(rng);
             // Perform the rotation.
@@ -71,7 +63,7 @@ pub fn run(
 
 fn main() {
     let dt_view = 0.02;
-    let t_max = 10.0;
+    let t_max = 12.0;
 
     let conn = &mut ricsek::db::establish_connection();
 
@@ -90,7 +82,7 @@ fn main() {
     run(
         conn,
         sim_setup.params,
-        sim_setup.segments,
+        sim_setup.capsules,
         sim_state,
         run_params,
     );

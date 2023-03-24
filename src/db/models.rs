@@ -25,5 +25,5 @@ pub struct Run {
     pub id: i32,
     pub created_at: time::OffsetDateTime,
     pub params: serde_json::Value,
-    pub segments: serde_json::Value,
+    pub capsules: serde_json::Value,
 }

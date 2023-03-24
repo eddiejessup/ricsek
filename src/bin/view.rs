@@ -1,8 +1,8 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
-use geo::{Centroid, EuclideanLength};
 use ricsek::{
-    common::{params::SimSetup, *},
     math::array_angle_to_x,
+    parameters::SimSetup,
+    state::{Agent, SimState},
 };
 
 const PL: f64 = 1000.0;
@@ -80,12 +80,12 @@ fn add_agents(
         ));
     });
 
-    for seg in sim_setup1.segments.iter() {
-        let centre = seg.centroid();
+    for cap in sim_setup1.capsules.iter() {
+        let centre = cap.centroid();
         let width_render = 1.0;
 
         let rect_shape = Vec2 {
-            x: transform_coord(seg.euclidean_length(), l),
+            x: transform_coord(cap.euclidean_length(), l),
             y: width_render,
         };
 
@@ -95,7 +95,7 @@ fn add_agents(
                 transform_coord(centre.y(), l),
                 0.0,
             ))
-            .with_rotation(Quat::from_rotation_z(array_angle_to_x(seg.end - seg.start) as f32));
+            .with_rotation(Quat::from_rotation_z(cap.angle_to_x() as f32));
 
         commands.spawn((MaterialMesh2dBundle {
             mesh: meshes.add(shape::Quad::new(rect_shape).into()).into(),

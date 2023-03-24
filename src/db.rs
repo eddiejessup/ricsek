@@ -1,5 +1,6 @@
-use crate::common::params::*;
-use crate::common::*;
+use crate::parameters::{simulation::*, SimSetup};
+use crate::state::*;
+use crate::math::capsule::Capsule;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenvy::dotenv;
@@ -20,7 +21,7 @@ pub fn establish_connection() -> PgConnection {
 pub fn initialize_run(
     conn: &mut PgConnection,
     sim_params: &SimParams,
-    segment_vals: &Vec<geo::Line>,
+    layout: &Vec<Capsule>,
 ) -> usize {
     use crate::db::schema::run::dsl::*;
     use diesel::dsl::Eq;
@@ -29,7 +30,7 @@ pub fn initialize_run(
             None::<Eq<id, i32>>,
             None::<Eq<created_at, time::OffsetDateTime>>,
             params.eq(serde_json::to_value(sim_params).unwrap()),
-            segments.eq(serde_json::to_value(segment_vals).unwrap()),
+            capsules.eq(serde_json::to_value(layout).unwrap()),
         ))
         .returning(id)
         .get_result(conn)
@@ -89,7 +90,7 @@ pub fn read_run(conn: &mut PgConnection, rid: usize) -> SimSetup {
         .unwrap();
     SimSetup {
         params: serde_json::from_value(v.params).unwrap(),
-        segments: serde_json::from_value(v.segments).unwrap(),
+        capsules: serde_json::from_value(v.capsules).unwrap(),
     }
 }
 

@@ -1,14 +1,12 @@
-pub mod params;
-
-pub struct Agent {
-    pub r: geo::Point,
-    pub u: geo::Point,
-}
-
 pub struct SimState {
     pub agents: Vec<Agent>,
     pub t: f64,
     pub step: usize,
+}
+
+pub struct Agent {
+    pub r: geo::Point,
+    pub u: geo::Point,
 }
 
 impl SimState {

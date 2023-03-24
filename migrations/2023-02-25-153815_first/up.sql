@@ -2,5 +2,5 @@ CREATE TABLE run (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     params JSONB NOT NULL,
-    segments JSONB NOT NULL
+    capsules JSONB NOT NULL
 );
