@@ -3,3 +3,4 @@ pub mod dynamics;
 pub mod math;
 pub mod parameters;
 pub mod state;
+pub mod view;

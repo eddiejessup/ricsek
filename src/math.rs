@@ -1,11 +1,22 @@
-use geo::{MapCoordsInPlace, MapCoords};
+use derive_more::{Add, Mul, Neg, Sub};
+use geo::{MapCoords, MapCoordsInPlace};
 use rand::distributions::Distribution;
 use rand::rngs::ThreadRng;
 
 pub mod capsule;
 
+#[derive(Debug, Add, Neg, Sub, Mul)]
+pub struct Vector(pub geo::Coord<f64>);
+
 pub fn rotate_point(v: geo::Point, theta: f64) -> geo::Point {
-  v.map_coords(|c| rotate_coords(c, theta))
+    v.map_coords(|c| rotate_coords(c, theta))
+}
+
+pub fn unit_angle_cos_sin(u: geo::Point, v: geo::Point) -> (f64, f64) {
+    let dot_product = u.x() * v.x() + u.y() * v.y();
+    let cross_product = u.x() * v.y() - u.y() * v.x();
+    let theta = cross_product.atan2(dot_product);
+    (theta.cos(), theta.sin())
 }
 
 pub fn rotate_point_inplace(v: &mut geo::Point, theta: f64) {
@@ -34,6 +45,6 @@ pub fn array_angle_to_x(v: geo::Coord) -> f64 {
 // theta = acos(1 - d/r) ~ d/r
 // so we get (d/r) * r / pi = d / pi
 pub fn circle_overlap_circumference(r: f64, d: f64) -> f64 {
-  let theta = (1.0 - (d / r)).acos();
-  (theta / std::f64::consts::PI) * r
+    let theta = (1.0 - (d / r)).acos();
+    (theta / std::f64::consts::PI) * r
 }

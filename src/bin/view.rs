@@ -1,131 +1,27 @@
-use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
-use ricsek::{
-    math::array_angle_to_x,
-    parameters::SimSetup,
-    state::{Agent, SimState},
-};
+use std::time::Duration;
 
-const PL: f64 = 1000.0;
-
-const TIME_STEP: f64 = 1.0 / 20.0;
-
-#[derive(Component)]
-struct AgentId(usize);
-
-#[derive(Component)]
-struct Movable;
-
-#[derive(Resource)]
-struct ViewState {
-    i: usize,
-    last_update_i: Option<usize>,
-}
-
-#[derive(Resource)]
-struct SimStates(Vec<SimState>);
-
-#[derive(Resource)]
-struct SimSetupRes(SimSetup);
-
-fn transform_coord(sd: f64, sl: f64) -> f32 {
-    (PL * sd / sl) as f32
-}
-
-fn agent_transform(a: &Agent, l: f64) -> Transform {
-    Transform::IDENTITY
-        .with_translation(Vec3::new(
-            transform_coord(a.r.x(), l),
-            transform_coord(a.r.y(), l),
-            0.,
-        ))
-        .with_rotation(Quat::from_rotation_z(array_angle_to_x(a.u.into()) as f32))
-}
-
-fn add_agents(
-    mut commands: Commands,
-    sim_states: Res<SimStates>,
-    sim_setup: Res<SimSetupRes>,
-    view_state: Res<ViewState>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-) {
-    commands.spawn(Camera2dBundle::default());
-
-    let view_i = view_state.i;
-    let cur_sim_state = &sim_states.0[view_i];
-
-    let sim_setup1 = &sim_setup.0;
-
-    let l = sim_setup1.params.l;
-
-    cur_sim_state.agents.iter().enumerate().for_each(|(i, a)| {
-        let color = match i % 5 {
-            0 => Color::RED,
-            1 => Color::GREEN,
-            2 => Color::BLUE,
-            3 => Color::PURPLE,
-            4 => Color::CYAN,
-            _ => Color::WHITE,
-        };
-        let rect_shape = Vec2 { x: 10.0, y: 1.0 };
-
-        commands.spawn((
-            MaterialMesh2dBundle {
-                mesh: meshes.add(shape::Quad::new(rect_shape).into()).into(),
-                material: materials.add(ColorMaterial::from(color)),
-                transform: agent_transform(a, l),
-                ..default()
-            },
-            AgentId(i),
-        ));
-    });
-
-    for cap in sim_setup1.capsules.iter() {
-        let centre = cap.centroid();
-        let width_render = 1.0;
-
-        let rect_shape = Vec2 {
-            x: transform_coord(cap.euclidean_length(), l),
-            y: width_render,
-        };
-
-        let transform = Transform::IDENTITY
-            .with_translation(Vec3::new(
-                transform_coord(centre.x(), l),
-                transform_coord(centre.y(), l),
-                0.0,
-            ))
-            .with_rotation(Quat::from_rotation_z(cap.angle_to_x() as f32));
-
-        commands.spawn((MaterialMesh2dBundle {
-            mesh: meshes.add(shape::Quad::new(rect_shape).into()).into(),
-            material: materials.add(ColorMaterial::from(Color::YELLOW)),
-            transform,
-            ..default()
-        },));
-    }
-}
+use bevy::{prelude::*, time::common_conditions::on_timer};
+use ricsek::view::*;
 
 fn update_agent_position(
     sim_states: Res<SimStates>,
     sim_setup: Res<SimSetupRes>,
     mut view_state: ResMut<ViewState>,
-    mut query: Query<(&mut Transform, &AgentId)>,
+    mut query_ag: Query<(&mut Transform, &AgentId, Option<&AgentDirectionId>)>,
 ) {
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
     let l = sim_setup.0.params.l;
 
-    if let Some(last_update_i) = view_state.last_update_i {
-        if last_update_i == view_i {
-            return;
-        }
-    }
     println!("Updating positions for agents, to view_i: {}", view_i);
-    for (mut transform, agent_id) in &mut query {
-        *transform = agent_transform(&cur_sim_state.agents[agent_id.0], l);
+    for (mut transform, agent_id, may_dir) in &mut query_ag {
+        let z_off = match may_dir {
+            Some(_) => 0.01,
+            None => 0.0,
+        };
+        *transform = agent_transform(&cur_sim_state.agents[agent_id.0], l, agent_id.0, z_off);
     }
-    view_state.last_update_i = Some(view_i);
+    view_state.mark_fresh();
 }
 fn change_view(
     keyboard_input: Res<Input<KeyCode>>,
@@ -152,6 +48,10 @@ fn change_view(
     view_state.i = i;
 }
 
+fn run_if_step_stale(view_state: Res<ViewState>) -> bool {
+    view_state.is_stale()
+}
+
 fn main() {
     let conn = &mut ricsek::db::establish_connection();
 
@@ -165,17 +65,12 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .insert_resource(SimStates(sim_states))
         .insert_resource(SimSetupRes(sim_setup))
-        .insert_resource(ViewState {
-            i: 0,
-            last_update_i: None,
-        })
+        .insert_resource(ViewState::new())
+        .add_startup_system(add_obstacles)
+        .add_startup_system(add_camera)
         .add_startup_system(add_agents)
-        .add_system_set(
-            SystemSet::new()
-                .with_run_criteria(bevy::time::FixedTimestep::step(TIME_STEP))
-                .with_system(update_agent_position)
-                .with_system(change_view),
-        )
+        .add_system(change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))))
+        .add_system(update_agent_position.run_if(run_if_step_stale))
         .add_system(bevy::window::close_on_esc)
         .run();
 

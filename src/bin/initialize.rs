@@ -11,23 +11,17 @@ pub const PLANE_SEGMENTS: [geo::Line; 1] = [geo::Line {
 }];
 
 fn main() {
-    let capsule_radius = 100e-6;
-    let layout = Vec::from(PLANE_SEGMENTS);
-    // let layout = vec![];
-
-    let capsules = Capsule::layout_to_capsules(layout, capsule_radius);
-
     let sim_params_phys = PhysicalParams {
-        dt: 0.01,
+        dt: 0.001,
         l: 200e-6,
         viscosity: 0.001,
         ag_f_propulse: 0.5e-12,
         ag_dipole_strength: 0.5e-18,
         aspect_ratio: 2.0,
-        ag_radius: 1e-6,
+        ag_radius: 2e-6,
         n: 1000,
         temp: 300.0,
-        seg_surface_stiffness: 10000000000000.0,
+        seg_surface_stiffness: 1000000000000000.0,
     };
     let sim_params = sim_params_phys.as_params();
     println!(
@@ -81,6 +75,11 @@ Computed derived parameters (for info only):
             u: rotate_point([0.0, 1.0].into(), th_distr.sample(&mut rng)),
         })
         .collect();
+
+    let capsule_radius = 20e-6;
+    let layout = Vec::from(PLANE_SEGMENTS);
+    // let layout = vec![];
+    let capsules = Capsule::layout_to_capsules(layout, capsule_radius, sim_params.l);
 
     let sim_state = SimState::new(agents);
 

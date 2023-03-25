@@ -62,8 +62,12 @@ pub fn run(
 }
 
 fn main() {
-    let dt_view = 0.02;
-    let t_max = 12.0;
+    // let dt_view = 0.05;
+    // let t_max = 10.0;
+    let dt_view = 1.0;
+    let t_max = 100.0;
+    // let dt_view = 0.5;
+    // let t_max = 50.0;
 
     let conn = &mut ricsek::db::establish_connection();
 

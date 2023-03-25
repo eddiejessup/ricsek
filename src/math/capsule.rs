@@ -31,7 +31,15 @@ impl Capsule {
         self.segment.centroid()
     }
 
-    pub fn euclidean_length(&self) -> f64 {
+    pub fn length(&self) -> f64 {
+        self.segment_length() + 2.0 * self.radius
+    }
+
+    pub fn width(&self) -> f64 {
+        2.0 * self.radius
+    }
+
+    pub fn segment_length(&self) -> f64 {
         self.segment.euclidean_length()
     }
 
@@ -68,9 +76,9 @@ impl Capsule {
         (s, to_surface_vec, dist_to_surface, centrepoint_unit)
     }
 
-    pub fn layout_to_capsules(c: Vec<geo::Line>, radius: f64) -> Vec<Capsule> {
+    pub fn layout_to_capsules(c: Vec<geo::Line>, radius: f64, l: f64) -> Vec<Capsule> {
         c.iter()
-            .map(|s| Capsule::new(s.start, s.end, radius))
+            .map(|s| Capsule::new(s.start * l / 2.0, s.end * l / 2.0, radius))
             .collect()
     }
 }
