@@ -1,5 +1,4 @@
 /target
-migrations/.DS_Store
 src/bin/run.rs
 assets/fonts/FiraCode-Regular.ttf
-.gitignore
+.DS_Store

@@ -19,9 +19,9 @@ fn main() {
         ag_dipole_strength: 0.5e-18,
         aspect_ratio: 2.0,
         ag_radius: 2e-6,
-        n: 1000,
+        ag_area_density: 0.1e12,
         temp: 300.0,
-        seg_surface_stiffness: 1000000000000000.0,
+        seg_surface_stiffness: 1e15,
     };
     let sim_params = sim_params_phys.as_params();
     println!(
@@ -34,13 +34,14 @@ Physical parameters:
     Viscosity: {viscosity} mPa·s
 
   Agents:
+    Mean area density: {ag_density:.1} cells/µm^2
     Propulsive force: {ag_f_propulse} pN
     Dipole strength: {ag_dipole_strength} pN·µm
     Effective radius: {ag_radius} µm
-    Count: {n}
 
 Derived parameters:
   Agents:
+    Count: {ag_n}
     Translational mobility: {ag_trans_mobility:.1} (µm/s)/pN
     Translational diffusion rate: {d_trans_diff:.1} µm^2/s
     Rotational diffusion rate: {d_rot_diff:.1} rad^2/s
@@ -57,8 +58,9 @@ Computed derived parameters (for info only):
         ag_f_propulse = 1e12 * sim_params_phys.ag_f_propulse,
         ag_dipole_strength = 1e18 * sim_params_phys.ag_dipole_strength,
         ag_radius = 1e6 * sim_params_phys.ag_radius,
-        n = sim_params_phys.n,
+        ag_density = 1e-12 * sim_params_phys.ag_area_density,
         ag_trans_mobility = 1e-6 * sim_params_phys.stokes_trans_mobility(),
+        ag_n = sim_params.n,
         d_trans_diff = 1e12 * sim_params.d_trans_diff,
         d_rot_diff = sim_params.d_rot_diff,
         ag_v_propulse = 1e6 * sim_params.ag_v_propulse,
