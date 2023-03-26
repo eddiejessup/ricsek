@@ -1,42 +1,18 @@
-use std::{iter::Sum, time::Duration};
+use std::time::Duration;
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle, time::common_conditions::on_timer};
 use geo::Point;
 use ricsek::{
     dynamics::obstacle::{agent_obstacle_electro, agent_obstacle_hydro},
-    math::point::{array_angle_to_x, point_magnitude},
+    math::{
+        linspace_grid,
+        point::{array_angle_to_x, point_magnitude, PointSum},
+    },
     view::*,
 };
 
-struct PointSum(geo::Point);
-
-impl Sum<PointSum> for PointSum {
-    fn sum<I>(iter: I) -> Self
-    where
-        I: Iterator<Item = PointSum>,
-    {
-        let mut sum = geo::Point::new(0.0, 0.0);
-        for p in iter {
-            sum += p.0;
-        }
-        PointSum(sum)
-    }
-}
-
 #[derive(Resource)]
 struct Samples(Vec<(Point, Point)>);
-
-fn linspace(start: f64, stop: f64, n: usize) -> Vec<f64> {
-    let step = (stop - start) / (n - 1) as f64;
-    (0..n).map(|i| start + i as f64 * step).collect()
-}
-
-fn linspace_grid(start: f64, stop: f64, n: usize) -> Vec<Point> {
-    let xs = linspace(start, stop, n);
-    xs.iter()
-        .flat_map(|x| xs.iter().map(move |y| Point::new(*x, *y)))
-        .collect()
-}
 
 fn add_samples(
     mut commands: Commands,
@@ -72,11 +48,12 @@ fn add_samples(
 
         // Agent direction.
         commands.spawn(MaterialMesh2dBundle {
-            mesh: meshes.add(arrow(10.0, 0.7)).into(),
+            mesh: meshes.add(arrow(0.7)).into(),
             material: materials.add(ColorMaterial::from(Color::GREEN)),
             transform: Transform::IDENTITY
                 .with_translation(Vec3::new(base_pos.x, base_pos.y, 10.1))
-                .with_rotation(Quat::from_rotation_z(array_angle_to_x(u.0) as f32)),
+                .with_rotation(Quat::from_rotation_z(array_angle_to_x(u.0) as f32))
+                .with_scale(Vec3::splat(10.0)),
             ..default()
         });
     }
@@ -109,11 +86,12 @@ fn add_electro_forces(
 
         // Force field.
         commands.spawn(MaterialMesh2dBundle {
-            mesh: meshes.add(arrow(point_magnitude(f) as f32, 1.0)).into(),
+            mesh: meshes.add(arrow(1.0)).into(),
             material: materials.add(ColorMaterial::from(Color::BLUE)),
             transform: Transform::IDENTITY
                 .with_translation(Vec3::new(base_pos.x, base_pos.y, 2.0))
-                .with_rotation(Quat::from_rotation_z(array_angle_to_x(f.0) as f32)),
+                .with_rotation(Quat::from_rotation_z(array_angle_to_x(f.0) as f32))
+                .with_scale(Vec3::splat(point_magnitude(f) as f32)),
             ..default()
         });
     }
@@ -147,13 +125,12 @@ fn add_hydro_forces(
 
         // Velocity field.
         commands.spawn(MaterialMesh2dBundle {
-            mesh: meshes
-                .add(arrow(point_magnitude(v).ln() as f32, 1.0))
-                .into(),
+            mesh: meshes.add(arrow(1.0)).into(),
             material: materials.add(ColorMaterial::from(Color::BLUE)),
             transform: Transform::IDENTITY
                 .with_translation(Vec3::new(base_pos.x, base_pos.y, 2.0))
-                .with_rotation(Quat::from_rotation_z(array_angle_to_x(v.0) as f32)),
+                .with_rotation(Quat::from_rotation_z(array_angle_to_x(v.0) as f32))
+                .with_scale(Vec3::splat(point_magnitude(v).ln() as f32)),
             ..default()
         });
 
@@ -189,9 +166,14 @@ fn main() {
     //   (geo::Point::new(-0.000006000778198242187, 0.00004634765014648438), u),
     // ]);
 
+    let env = EnvironmentRes {
+        l: sim_setup.params.l,
+    };
+
     App::new()
         .add_plugins(DefaultPlugins)
         .insert_resource(SimSetupRes(sim_setup))
+        .insert_resource(env)
         .insert_resource(samples)
         .add_startup_system(add_obstacles)
         .add_startup_system(add_samples)

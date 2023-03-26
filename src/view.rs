@@ -24,6 +24,11 @@ pub struct ViewState {
     pub rendered_i: Option<usize>,
 }
 
+#[derive(Resource)]
+pub struct EnvironmentRes {
+    pub l: f64,
+}
+
 impl ViewState {
     pub fn new() -> Self {
         Self {
@@ -129,10 +134,10 @@ pub fn add_agents(
 
         commands.spawn((
             MaterialMesh2dBundle {
-                mesh: meshes.add(arrow(10.0, 1.0)).into(),
+                mesh: meshes.add(arrow(1.0)).into(),
                 material: materials.add(ColorMaterial::from(Color::RED)),
                 // Add small amount to 'z' translation to avoid overlap
-                transform: agent_transform(a, l, i, 0.01),
+                transform: agent_transform(a, l, i, 0.01).with_scale(Vec3::splat(10.0)),
                 ..default()
             },
             AgentId(i),
@@ -212,7 +217,7 @@ pub fn add_obstacles(
     }
 }
 
-pub fn arrow(s: f32, ar: f32) -> Mesh {
+pub fn arrow(ar: f32) -> Mesh {
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
     // Define the vertices of the arrow
@@ -242,7 +247,7 @@ pub fn arrow(s: f32, ar: f32) -> Mesh {
     ]
     .iter()
     .map(|v| {
-        let mut vec3 = Vec3::from(*v) * s;
+        let mut vec3 = Vec3::from(*v);
         vec3.y *= ar;
         vec3
     })
@@ -259,7 +264,7 @@ pub fn arrow(s: f32, ar: f32) -> Mesh {
 }
 
 pub fn cursor_system(
-    sim_setup: Res<SimSetupRes>,
+    env: Res<EnvironmentRes>,
     // need to get window dimensions
     window_query: Query<&Window, With<bevy::window::PrimaryWindow>>,
     // query to get camera transform
@@ -280,13 +285,11 @@ pub fn cursor_system(
         .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
         .map(|ray| ray.origin.truncate())
     {
-        let l = sim_setup.0.params.l;
-
         eprintln!("Pixel coords: {}/{}", world_position.x, world_position.y);
         eprintln!(
             "Sim coords: {}/{}",
-            invert_coord(world_position.x, l),
-            invert_coord(world_position.y, l)
+            invert_coord(world_position.x, env.l),
+            invert_coord(world_position.y, env.l)
         );
     }
 }

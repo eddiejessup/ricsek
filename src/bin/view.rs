@@ -23,18 +23,14 @@ fn update_agent_position(
     }
     view_state.mark_fresh();
 }
-fn increment_step(
-    cur_i: usize,
-    backward: bool,
-    maxi: usize,
-) -> usize {
+fn increment_step(cur_i: usize, backward: bool, maxi: usize) -> usize {
     if backward {
-      match cur_i {
-        0 => 0,
-        _ => cur_i - 1,
-      }
+        match cur_i {
+            0 => 0,
+            _ => cur_i - 1,
+        }
     } else {
-      (cur_i + 1).min(maxi)
+        (cur_i + 1).min(maxi)
     }
 }
 
@@ -44,15 +40,15 @@ fn change_view(
     mut view_state: ResMut<ViewState>,
 ) {
     let backward = if keyboard_input.pressed(KeyCode::Left) {
-      Some(true)
+        Some(true)
     } else if keyboard_input.pressed(KeyCode::Right) {
-      Some(false)
+        Some(false)
     } else {
-      None
+        None
     };
 
     if let Some(backward) = backward {
-      view_state.i = increment_step(view_state.i, backward, sim_states.0.len() - 1);
+        view_state.i = increment_step(view_state.i, backward, sim_states.0.len() - 1);
     }
 }
 
@@ -67,10 +63,15 @@ fn main() {
     let sim_setup = ricsek::db::read_run(conn, run_id);
     let sim_states = ricsek::db::read_run_sim_states(conn, run_id);
 
+    let env = EnvironmentRes {
+        l: sim_setup.params.l,
+    };
+
     println!("Got {} sim-states", sim_states.len());
 
     App::new()
         .add_plugins(DefaultPlugins)
+        .insert_resource(env)
         .insert_resource(SimStates(sim_states))
         .insert_resource(SimSetupRes(sim_setup))
         .insert_resource(ViewState::new())

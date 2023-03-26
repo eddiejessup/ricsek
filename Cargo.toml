@@ -30,3 +30,6 @@ name = "run"
 
 [[bin]]
 name = "view"
+
+[[bin]]
+name = "view_stokes_solutions"
