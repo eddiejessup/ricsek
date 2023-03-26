@@ -78,18 +78,18 @@ impl PhysicalParams {
         // m^2 / (m s)
         // m / s
         // speed! good.
-        let k_repulse = 3.0 * self.ag_dipole_strength / (64.0 * PI * self.viscosity);
+        let hydro_k_repulse = 3.0 * self.ag_dipole_strength / (64.0 * PI * self.viscosity);
         SimParams {
             dt: self.dt,
             l: self.l,
             n: (self.ag_area_density * self.env_area()).round() as usize,
             // Capsule electrostatics.
             ag_radius: self.ag_radius,
-            seg_v_overlap_coeff: self.v_hertz_coeff(),
+            hertz_coeff: self.v_hertz_coeff(),
             // Propulsion.
             ag_v_propulse: self.force_to_velocity(self.ag_f_propulse),
             // Capsule hydrodynamics.
-            k_repulse,
+            hydro_k_repulse,
             aspect_ratio: self.aspect_ratio,
 
             // Diffusion.

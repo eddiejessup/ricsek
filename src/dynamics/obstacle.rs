@@ -1,24 +1,9 @@
 use crate::{
-    math::{capsule::Capsule, unit_angle_cos_sin},
+    math::{capsule::Capsule, point::unit_angle_cos_sin},
     state::Agent,
 };
 
-fn agent_obstacle_electro_kinematics(
-    y_unit: geo::Point,
-    overlap: f64,
-    electro_coeff: f64,
-) -> geo::Point {
-    // Electrostatics is only relevant if the swimmer's surface is below the
-    // capsule surface.
-    // If agent is further away from the surface than the radius of the agent,
-    // then no force.
-    if overlap > 0.0 {
-        // Negative means away from y_unit, meaning repulsion.
-        -y_unit * electro_coeff * overlap.powi(3).sqrt()
-    } else {
-        geo::Point(geo::Coord { x: 0.0, y: 0.0 })
-    }
-}
+use super::common::electro_kinematics;
 
 pub fn agent_obstacle_electro(
     r: geo::Point,
@@ -35,7 +20,11 @@ pub fn agent_obstacle_electro(
     let rs_s_dist = rc_s_dist - agent_radius;
 
     // The overlap is the negative of the above signed distance.
-    agent_obstacle_electro_kinematics(rc_c_unit, -rs_s_dist, electro_coeff)
+    // Electrostatics is only relevant if the swimmer's surface is below the
+    // capsule surface.
+    // If agent is further away from the surface than the radius of the agent,
+    // then no force.
+    electro_kinematics(rc_c_unit, -rs_s_dist, electro_coeff)
 }
 
 fn agent_obstacle_hydro_kinematics(
@@ -157,20 +146,20 @@ mod tests {
     //     let y_unit = geo::coord! {x: 1.0, y: 0.0}.into();
     //     for y_mag in [10.0, 1.0] {
     //         let (res_v, res_om) =
-    //             agent_obstacle_electro_kinematics(y_unit, y_mag, agent_radius, electro_coeff);
+    //             electro_kinematics(y_unit, y_mag, agent_radius, electro_coeff);
 
     //         assert_eq!(res_om, 0.0);
     //         assert_eq!(res_v, geo::coord! {x: 0.0, y: 0.0}.into());
     //     }
 
     //     let (res_v, res_om) =
-    //         agent_obstacle_electro_kinematics(y_unit, 0.9, agent_radius, electro_coeff);
+    //         electro_kinematics(y_unit, 0.9, agent_radius, electro_coeff);
     //     assert_eq!(res_om, 0.0);
     //     assert_eq!(res_v, geo::coord! {x: -0.031622776601683784, y: 0.0}.into());
 
     //     let y_unit = geo::coord! {x: -1.0, y: 0.0}.into();
     //     let (res_v, res_om) =
-    //         agent_obstacle_electro_kinematics(y_unit, 0.9, agent_radius, electro_coeff);
+    //         electro_kinematics(y_unit, 0.9, agent_radius, electro_coeff);
     //     assert_eq!(res_om, 0.0);
     //     assert_eq!(res_v, geo::coord! {x: 0.031622776601683784, y: 0.0}.into());
     // }

@@ -1,7 +1,7 @@
 use rand::distributions::Uniform;
 use rand_distr::Distribution;
 use ricsek::math::capsule::Capsule;
-use ricsek::math::{random_coord, rotate_point};
+use ricsek::math::point::{random_coord, rotate_point};
 use ricsek::parameters::physical::PhysicalParams;
 use ricsek::state::*;
 
@@ -19,7 +19,7 @@ fn main() {
         ag_dipole_strength: 0.5e-18,
         aspect_ratio: 2.0,
         ag_radius: 2e-6,
-        ag_area_density: 0.1e12,
+        ag_area_density: 0.01e12,
         temp: 300.0,
         seg_surface_stiffness: 1e15,
     };

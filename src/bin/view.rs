@@ -23,29 +23,37 @@ fn update_agent_position(
     }
     view_state.mark_fresh();
 }
+fn increment_step(
+    cur_i: usize,
+    backward: bool,
+    maxi: usize,
+) -> usize {
+    if backward {
+      match cur_i {
+        0 => 0,
+        _ => cur_i - 1,
+      }
+    } else {
+      (cur_i + 1).min(maxi)
+    }
+}
+
 fn change_view(
     keyboard_input: Res<Input<KeyCode>>,
     sim_states: Res<SimStates>,
     mut view_state: ResMut<ViewState>,
 ) {
-    let mut i = view_state.i;
-    if keyboard_input.pressed(KeyCode::Left) && i > 0 {
-        println!("Handling left");
-        i -= 1;
-    }
+    let backward = if keyboard_input.pressed(KeyCode::Left) {
+      Some(true)
+    } else if keyboard_input.pressed(KeyCode::Right) {
+      Some(false)
+    } else {
+      None
+    };
 
-    if keyboard_input.pressed(KeyCode::Right) {
-        println!("Handling right, {}", sim_states.0.len() - 1);
-        i += 1;
-        i = i.min(sim_states.0.len() - 1);
-        println!("Now {}", i);
+    if let Some(backward) = backward {
+      view_state.i = increment_step(view_state.i, backward, sim_states.0.len() - 1);
     }
-
-    if i != view_state.i {
-        println!("Changing view to i: {}", i);
-    }
-
-    view_state.i = i;
 }
 
 fn run_if_step_stale(view_state: Res<ViewState>) -> bool {

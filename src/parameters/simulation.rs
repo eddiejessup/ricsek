@@ -2,13 +2,13 @@
 pub struct SimParams {
     pub dt: f64,
     pub l: f64,
-    pub k_repulse: f64,
+    pub hydro_k_repulse: f64,
     pub ag_radius: f64,
     pub aspect_ratio: f64,
     pub ag_v_propulse: f64,
     pub d_trans_diff: f64,
     pub d_rot_diff: f64,
-    pub seg_v_overlap_coeff: f64,
+    pub hertz_coeff: f64,
     pub n: usize,
 }
 

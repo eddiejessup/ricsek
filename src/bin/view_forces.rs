@@ -4,7 +4,7 @@ use bevy::{prelude::*, sprite::MaterialMesh2dBundle, time::common_conditions::on
 use geo::Point;
 use ricsek::{
     dynamics::obstacle::{agent_obstacle_electro, agent_obstacle_hydro},
-    math::{array_angle_to_x, capsule::point_magnitude},
+    math::point::{array_angle_to_x, point_magnitude},
     view::*,
 };
 
@@ -54,21 +54,23 @@ fn add_samples(
     for (r, u) in &samples.0 {
         let base_pos = Vec2::new(transform_coord(r.x(), l), transform_coord(r.y(), l));
 
-        // commands.spawn(MaterialMesh2dBundle {
-        //     mesh: meshes
-        //         .add(
-        //             (shape::Circle {
-        //                 radius: transform_coord(radius, l),
-        //                 vertices: 10,
-        //             })
-        //             .into(),
-        //         )
-        //         .into(),
-        //     material: materials.add(ColorMaterial::from(Color::RED)),
-        //     transform: Transform::IDENTITY.with_translation(Vec3::new(base_pos.x, base_pos.y, 1.0)),
-        //     ..default()
-        // });
+        // Agent shape (approximated as a circle).
+        commands.spawn(MaterialMesh2dBundle {
+            mesh: meshes
+                .add(
+                    (shape::Circle {
+                        radius: transform_coord(radius, l),
+                        vertices: 10,
+                    })
+                    .into(),
+                )
+                .into(),
+            material: materials.add(ColorMaterial::from(Color::RED)),
+            transform: Transform::IDENTITY.with_translation(Vec3::new(base_pos.x, base_pos.y, 1.0)),
+            ..default()
+        });
 
+        // Agent direction.
         commands.spawn(MaterialMesh2dBundle {
             mesh: meshes.add(arrow(10.0, 0.7)).into(),
             material: materials.add(ColorMaterial::from(Color::GREEN)),
@@ -105,6 +107,7 @@ fn add_electro_forces(
             .sum::<PointSum>()
             .0;
 
+        // Force field.
         commands.spawn(MaterialMesh2dBundle {
             mesh: meshes.add(arrow(point_magnitude(f) as f32, 1.0)).into(),
             material: materials.add(ColorMaterial::from(Color::BLUE)),
@@ -142,22 +145,19 @@ fn add_hydro_forces(
                 (v + v1, om + om1)
             });
 
-        // Debug print f
-        if point_magnitude(v) > 0.0 {
-            println!("v_hydro: {:?}", v);
-        }
+        // Velocity field.
+        commands.spawn(MaterialMesh2dBundle {
+            mesh: meshes
+                .add(arrow(point_magnitude(v).ln() as f32, 1.0))
+                .into(),
+            material: materials.add(ColorMaterial::from(Color::BLUE)),
+            transform: Transform::IDENTITY
+                .with_translation(Vec3::new(base_pos.x, base_pos.y, 2.0))
+                .with_rotation(Quat::from_rotation_z(array_angle_to_x(v.0) as f32)),
+            ..default()
+        });
 
-        // commands.spawn(MaterialMesh2dBundle {
-        //     mesh: meshes
-        //         .add(arrow(point_magnitude(v).ln() as f32, 1.0))
-        //         .into(),
-        //     material: materials.add(ColorMaterial::from(Color::BLUE)),
-        //     transform: Transform::IDENTITY
-        //         .with_translation(Vec3::new(base_pos.x, base_pos.y, 2.0))
-        //         .with_rotation(Quat::from_rotation_z(array_angle_to_x(v.0) as f32)),
-        //     ..default()
-        // });
-
+        // Torque field (just a sign indicator).
         commands.spawn(Text2dBundle {
             text: Text::from_section(
                 if om > 0.0 { "+" } else { "-" },
@@ -195,7 +195,7 @@ fn main() {
         .insert_resource(samples)
         .add_startup_system(add_obstacles)
         .add_startup_system(add_samples)
-        // .add_startup_system(add_electro_forces)
+        .add_startup_system(add_electro_forces)
         .add_startup_system(add_hydro_forces)
         .add_startup_system(add_camera)
         .add_system(bevy::window::close_on_esc)

@@ -1,5 +1,5 @@
 use crate::{
-    math::array_angle_to_x,
+    math::point,
     parameters::SimSetup,
     state::{Agent, SimState},
 };
@@ -74,7 +74,9 @@ pub fn agent_transform(a: &Agent, l: f64, i: usize, z_offset: f32) -> Transform 
             transform_coord(a.r.y(), l),
             z,
         ))
-        .with_rotation(Quat::from_rotation_z(array_angle_to_x(a.u.into()) as f32))
+        .with_rotation(Quat::from_rotation_z(
+            point::array_angle_to_x(a.u.into()) as f32
+        ))
 }
 
 pub fn add_camera(mut commands: Commands) {

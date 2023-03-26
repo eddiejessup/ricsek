@@ -1,14 +1,6 @@
 use geo::{Centroid, EuclideanLength};
 
-use super::array_angle_to_x;
-
-pub fn coord_magnitude(c: geo::Coord) -> f64 {
-    (c.x.powi(2) + c.y.powi(2)).sqrt()
-}
-
-pub fn point_magnitude(c: geo::Point) -> f64 {
-    coord_magnitude(c.0)
-}
+use super::point;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Capsule<T = f64>
@@ -44,7 +36,7 @@ impl Capsule {
     }
 
     pub fn angle_to_x(&self) -> f64 {
-        array_angle_to_x(self.segment.end - self.segment.start)
+        point::array_angle_to_x(self.segment.end - self.segment.start)
     }
 
     pub fn closest_point(&self, p: geo::Point) -> (geo::Point, geo::Point, f64, geo::Point) {
@@ -61,7 +53,7 @@ impl Capsule {
         // The vector from the point to the centerline.
         let p_c = c - p;
         // The distance from the point to the centerline.
-        let p_c_mag = point_magnitude(p_c);
+        let p_c_mag = point::point_magnitude(p_c);
         // Unit vector from the point towards the centerline.
         let p_c_u = p_c / p_c_mag;
         // The point on the surface of the capsule.
