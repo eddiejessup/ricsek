@@ -1,6 +1,7 @@
-use geo::{Centroid, EuclideanLength};
+use geo::{coord, Centroid, EuclideanLength};
+use nalgebra::{vector, Point2, Unit, UnitVector2, Vector2};
 
-use super::point;
+use super::angle_to_x;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Capsule<T = f64>
@@ -12,15 +13,19 @@ where
 }
 
 impl Capsule {
-    pub fn new(start: geo::Coord, end: geo::Coord, radius: f64) -> Capsule {
+    pub fn new(start: Point2<f64>, end: Point2<f64>, radius: f64) -> Capsule {
         Capsule {
-            segment: geo::Line { start, end },
+            segment: geo::Line {
+                start: coord! {x: start.x, y: start.y},
+                end: coord! {x: end.x, y: end.y},
+            },
             radius,
         }
     }
 
-    pub fn centroid(&self) -> geo::Point {
-        self.segment.centroid()
+    pub fn centroid(&self) -> Point2<f64> {
+        let gp = self.segment.centroid();
+        Point2::new(gp.x(), gp.y())
     }
 
     pub fn length(&self) -> f64 {
@@ -36,41 +41,38 @@ impl Capsule {
     }
 
     pub fn angle_to_x(&self) -> f64 {
-        point::array_angle_to_x(self.segment.end - self.segment.start)
+        let r = self.segment.end - self.segment.start;
+        angle_to_x(vector!(r.x, r.y))
     }
 
-    pub fn closest_point(&self, p: geo::Point) -> (geo::Point, geo::Point, f64, geo::Point) {
-        let c = match geo::ClosestPoint::closest_point(&self.segment, &p) {
+    pub fn closest_point(
+        &self,
+        p: Point2<f64>,
+    ) -> (Point2<f64>, Vector2<f64>, f64, UnitVector2<f64>) {
+        let c = match geo::ClosestPoint::closest_point(&self.segment, &geo::point!(x: p.x, y: p.y))
+        {
             geo::Closest::Intersection(_p) => {
                 panic!("Intersection: point lies on capsule centerline");
             }
             geo::Closest::Indeterminate => {
                 panic!("No single closest point to capsule centerline");
             }
-            geo::Closest::SinglePoint(p) => p,
+            geo::Closest::SinglePoint(p) => Point2::new(p.x(), p.y()),
         };
 
         // The vector from the point to the centerline.
         let p_c = c - p;
         // The distance from the point to the centerline.
-        let p_c_mag = point::point_magnitude(p_c);
+        let p_c_mag = p_c.magnitude();
         // Unit vector from the point towards the centerline.
-        let p_c_u = p_c / p_c_mag;
+        let p_c_u = Unit::new_normalize(p_c);
         // The point on the surface of the capsule.
-        let s = c - (p_c_u * self.radius);
+        let s = c - (p_c_u.into_inner() * self.radius);
 
         let dist_to_surface = p_c_mag - self.radius;
 
         let to_surface_vec = s - p;
 
-        let centrepoint_unit = p_c / p_c_mag;
-
-        (s, to_surface_vec, dist_to_surface, centrepoint_unit)
-    }
-
-    pub fn layout_to_capsules(c: Vec<geo::Line>, radius: f64, l: f64) -> Vec<Capsule> {
-        c.iter()
-            .map(|s| Capsule::new(s.start * l / 2.0, s.end * l / 2.0, radius))
-            .collect()
+        (s, to_surface_vec, dist_to_surface, p_c_u)
     }
 }

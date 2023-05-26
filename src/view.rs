@@ -1,9 +1,9 @@
 use crate::{
-    math::point,
     parameters::SimSetup,
-    state::{Agent, SimState},
+    state::{Agent, SimState}, math::capsule::Capsule,
 };
 use bevy::{prelude::*, render::render_resource::PrimitiveTopology, sprite::MaterialMesh2dBundle};
+use nalgebra::{Vector2, Point2};
 
 const PL: f64 = 1000.0;
 
@@ -28,6 +28,9 @@ pub struct ViewState {
 pub struct EnvironmentRes {
     pub l: f64,
 }
+
+#[derive(Resource)]
+pub struct Obstacles(pub Vec<Capsule>);
 
 impl ViewState {
     pub fn new() -> Self {
@@ -59,6 +62,10 @@ pub fn transform_coord(sd: f64, sl: f64) -> f32 {
     (PL * sd / sl) as f32
 }
 
+pub fn transform_vec(sd: Point2<f64>, sl: f64, z: f32) -> Vec3 {
+  Vec3::new(transform_coord(sd.x, sl), transform_coord(sd.y, sl), z)
+}
+
 pub fn invert_coord(sd: f32, sl: f64) -> f64 {
     sl * (sd as f64) / PL
 }
@@ -75,13 +82,11 @@ pub fn agent_transform(a: &Agent, l: f64, i: usize, z_offset: f32) -> Transform 
         };
     Transform::IDENTITY
         .with_translation(Vec3::new(
-            transform_coord(a.r.x(), l),
-            transform_coord(a.r.y(), l),
+            transform_coord(a.r.x, l),
+            transform_coord(a.r.y, l),
             z,
         ))
-        .with_rotation(Quat::from_rotation_z(
-            point::array_angle_to_x(a.u.into()) as f32
-        ))
+        .with_rotation(Quat::from_rotation_z(a.u.angle(&Vector2::x()) as f32))
 }
 
 pub fn add_camera(mut commands: Commands) {
@@ -148,15 +153,14 @@ pub fn add_agents(
 
 pub fn add_obstacles(
     mut commands: Commands,
-    sim_setup: Res<SimSetupRes>,
+    env: Res<EnvironmentRes>,
+    capsules: Res<Obstacles>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let sim_setup = &sim_setup.0;
-
-    let l = sim_setup.params.l;
+    let l = env.l;
     let z: f32 = 0.0;
-    for cap in sim_setup.capsules.iter() {
+    for cap in &capsules.0 {
         let centre = cap.centroid();
 
         let cap_shape = Vec2 {
@@ -166,8 +170,8 @@ pub fn add_obstacles(
 
         let transform = Transform::IDENTITY
             .with_translation(Vec3::new(
-                transform_coord(centre.x(), l),
-                transform_coord(centre.y(), l),
+                transform_coord(centre.x, l),
+                transform_coord(centre.y, l),
                 z,
             ))
             .with_rotation(Quat::from_rotation_z(cap.angle_to_x() as f32));

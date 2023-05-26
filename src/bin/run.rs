@@ -1,10 +1,11 @@
+use nalgebra::Rotation2;
 use rand_distr::{Distribution, Normal};
 use ricsek::dynamics::agent::agent_agents_electro;
 use ricsek::dynamics::boundary::wrap;
 use ricsek::dynamics::brownian::{rot_brownian_distr, trans_brownian_distr};
 use ricsek::dynamics::obstacle::agent_obstacles_kinematics;
 use ricsek::math::capsule::Capsule;
-use ricsek::math::point::{random_coord, rotate_point_inplace};
+use ricsek::math::point::{random_vector};
 use ricsek::parameters::{simulation::SimParams, RunParams};
 use ricsek::state::*;
 
@@ -34,12 +35,12 @@ pub fn update(
         v += v_agents;
 
         // Agent propulsion.
-        v += agent.u * sim_params.ag_v_propulse;
+        v += agent.u.into_inner() * sim_params.ag_v_propulse;
 
         // Update agent position from velocity.
         agent.r += v * sim_params.dt;
         // Compute translational diffusion translation.
-        agent.r += random_coord(rng, trans_diff_distr).into();
+        agent.r += random_vector(rng, trans_diff_distr);
 
         // Apply periodic boundary condition.
         wrap(&mut agent.r, sim_params.l);
@@ -48,7 +49,7 @@ pub fn update(
         // Compute rotational diffusion rotation.
         dth += &rot_diff_distr.sample(rng);
         // Perform the rotation.
-        rotate_point_inplace(&mut agent.u, dth);
+        agent.u = Rotation2::new(dth) * agent.u;
     };
 
 
@@ -88,7 +89,7 @@ pub fn run(
 
 fn main() {
     let dt_view = 0.05;
-    let t_max = 10.0;
+    let t_max = 20.0;
     // let dt_view = 1.0;
     // let t_max = 100.0;
     // let dt_view = 0.5;

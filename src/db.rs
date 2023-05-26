@@ -1,9 +1,10 @@
+use crate::math::capsule::Capsule;
 use crate::parameters::{simulation::*, SimSetup};
 use crate::state::*;
-use crate::math::capsule::Capsule;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenvy::dotenv;
+use nalgebra::{Point2, UnitVector2, Vector2};
 use std::env;
 use time;
 
@@ -61,10 +62,10 @@ pub fn write_checkpoint(conn: &mut PgConnection, rid: usize, sim_state: &SimStat
             (
                 agent_id.eq(aid as i32),
                 env_id.eq(eid),
-                rx.eq(a.r.x()),
-                ry.eq(a.r.y()),
-                ux.eq(a.u.x()),
-                uy.eq(a.u.y()),
+                rx.eq(a.r.x),
+                ry.eq(a.r.y),
+                ux.eq(a.u.x),
+                uy.eq(a.u.y),
             )
         })
         .collect();
@@ -114,8 +115,8 @@ pub fn env_to_sim_state(conn: &mut PgConnection, env: &models::Env) -> SimState 
     let agents: Vec<Agent> = agent_vals
         .iter()
         .map(|a| Agent {
-            r: (a.rx, a.ry).into(),
-            u: (a.ux, a.uy).into(),
+            r: Point2::new(a.rx, a.ry),
+            u: UnitVector2::new_normalize(Vector2::new(a.ux, a.uy)),
         })
         .collect();
 

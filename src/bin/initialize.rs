@@ -1,14 +1,10 @@
+use nalgebra::{point, Unit, UnitComplex, Vector2};
 use rand::distributions::Uniform;
 use rand_distr::Distribution;
 use ricsek::math::capsule::Capsule;
-use ricsek::math::point::{random_coord, rotate_point};
+use ricsek::math::point::random_point;
 use ricsek::parameters::physical::PhysicalParams;
 use ricsek::state::*;
-
-pub const PLANE_SEGMENTS: [geo::Line; 1] = [geo::Line {
-    start: geo::coord! {x: 0.0, y: -0.25},
-    end: geo::coord! {x: 0.0, y: 0.25},
-}];
 
 fn main() {
     let sim_params_phys = PhysicalParams {
@@ -73,15 +69,17 @@ Computed derived parameters (for info only):
     let th_distr = Uniform::new(-std::f64::consts::PI, std::f64::consts::PI);
     let agents = (0..sim_params.n)
         .map(|_i| Agent {
-            r: random_coord(&mut rng, r_distr).into(),
-            u: rotate_point([0.0, 1.0].into(), th_distr.sample(&mut rng)),
+            r: random_point(&mut rng, r_distr).into(),
+            u: Unit::new_normalize(UnitComplex::new(th_distr.sample(&mut rng)) * Vector2::x()),
         })
         .collect();
 
     let capsule_radius = 20e-6;
-    let layout = Vec::from(PLANE_SEGMENTS);
-    // let layout = vec![];
-    let capsules = Capsule::layout_to_capsules(layout, capsule_radius, sim_params.l);
+    let capsules = vec![(point![0.0, -0.25], point![0.0, 0.25])]
+        .iter()
+        .map(|(s, e)| (s * sim_params_phys.l / 2.0, e * sim_params_phys.l / 2.0))
+        .map(|(s, e)| Capsule::new(s, e, capsule_radius))
+        .collect();
 
     let sim_state = SimState::new(agents);
 

@@ -1,18 +1,17 @@
-use crate::math::point;
+use nalgebra::{Point2, Vector2, UnitVector2, zero};
 
 use super::common::electro_kinematics;
 
 pub fn agent_agent_electro(
-    r1: &geo::Point,
-    r2: &geo::Point,
+    r1: &Point2<f64>,
+    r2: &Point2<f64>,
     agent_radius: f64,
     electro_coeff: f64,
-) -> geo::Point {
+) -> Vector2<f64> {
     let r1c_r2c = *r2 - *r1;
-    let r1c_r2c_dist = point::point_magnitude(r1c_r2c);
     electro_kinematics(
-        r1c_r2c / r1c_r2c_dist,
-        2.0 * agent_radius - r1c_r2c_dist,
+        UnitVector2::new_normalize(r1c_r2c),
+        2.0 * agent_radius - r1c_r2c.magnitude(),
         electro_coeff,
     )
 }
@@ -20,19 +19,19 @@ pub fn agent_agent_electro(
 // Super naive implementation.
 pub fn agent_agents_electro(
     i1: usize,
-    r1: &geo::Point,
-    rs: &[geo::Point],
+    r1: &Point2<f64>,
+    rs: &[Point2<f64>],
     agent_radius: f64,
     electro_coeff: f64,
-) -> geo::Point {
+) -> Vector2<f64> {
     rs.iter()
         .enumerate()
         .map(|(i2, r2)| {
             if i1 == i2 {
-                geo::Point::new(0.0, 0.0)
+                zero()
             } else {
                 agent_agent_electro(r1, r2, agent_radius, electro_coeff)
             }
         })
-        .fold(geo::Point::new(0.0, 0.0), |r1, r2| r1 + r2)
+        .sum()
 }

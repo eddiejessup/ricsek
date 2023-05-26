@@ -1,3 +1,5 @@
+use nalgebra::{Point2, Vector2, UnitVector2, zero};
+
 use crate::{
     math::{capsule::Capsule, point::unit_angle_cos_sin},
     state::Agent,
@@ -6,11 +8,11 @@ use crate::{
 use super::common::electro_kinematics;
 
 pub fn agent_obstacle_electro(
-    r: geo::Point,
+    r: Point2<f64>,
     capsule: &Capsule,
     agent_radius: f64,
     electro_coeff: f64,
-) -> geo::Point {
+) -> Vector2<f64> {
     // The vector from the swimmer's centre to the surface.
     // rc_s_dist < 0 means the swimmer's centre is beneath the surface.
     let (_s, _rc_s_vec, rc_s_dist, rc_c_unit) = capsule.closest_point(r);
@@ -28,14 +30,14 @@ pub fn agent_obstacle_electro(
 }
 
 fn agent_obstacle_hydro_kinematics(
-    y_unit: geo::Point,
+    y_unit: UnitVector2<f64>,
     y_mag: f64,
-    u: geo::Point,
+    u: UnitVector2<f64>,
     aspect_ratio: f64,
     hydro_coeff: f64,
-) -> (geo::Point, f64) {
+) -> (Vector2<f64>, f64) {
     if y_mag <= 0.0 {
-        (geo::Point::new(0.0, 0.0), 0.0)
+        (zero(), 0.0)
     } else {
         // https://arxiv.org/pdf/0806.2898.pdf
         // The velocity component of the swimmer towards the cap:
@@ -61,17 +63,17 @@ fn agent_obstacle_hydro_kinematics(
         let om_hydro = -(hydro_coeff * cos_th * sin_th / y_mag.powi(3))
             * (1.0 + ar_factor * (1.0 + cos_th.powi(2)));
 
-        (y_unit * v_hydro_mag, om_hydro)
+        (y_unit.into_inner() * v_hydro_mag, om_hydro)
     }
 }
 
 pub fn agent_obstacle_hydro(
-    r: geo::Point,
-    u: geo::Point,
+    r: Point2<f64>,
+    u: UnitVector2<f64>,
     capsule: &Capsule,
     aspect_ratio: f64,
     hydro_coeff: f64,
-) -> (geo::Point, f64) {
+) -> (Vector2<f64>, f64) {
     // The vector from the swimmer's centre to the surface.
     // rc_s_dist < 0 means the swimmer's centre is beneath the surface.
     let (_s, _rc_s_vec, rc_s_dist, rc_c_unit) = capsule.closest_point(r);
@@ -86,7 +88,7 @@ pub fn agent_obstacle_kinematics(
     aspect_ratio: f64,
     hydro_coeff: f64,
     electro_coeff: f64,
-) -> (geo::Point, f64) {
+) -> (Vector2<f64>, f64) {
     // The vector from the swimmer's centre to the surface.
     // rc_s_dist < 0 means the swimmer's centre is beneath the surface.
     let (_s, _rc_s_vec, rc_s_dist, rc_c_unit) = capsule.closest_point(agent.r);
@@ -116,7 +118,7 @@ pub fn agent_obstacles_kinematics(
     aspect_ratio: f64,
     hydro_coeff: f64,
     electro_coeff: f64,
-) -> (geo::Point, f64) {
+) -> (Vector2<f64>, f64) {
     capsules
         .iter()
         .map(|cap| {
@@ -129,38 +131,7 @@ pub fn agent_obstacles_kinematics(
                 electro_coeff,
             )
         })
-        .fold((geo::Point::new(0.0, 0.0), 0.0), |(v, om), (v1, om1)| {
+        .fold((zero(), 0.0), |(v, om), (v1, om1)| {
             (v + v1, om + om1)
         })
-}
-
-#[cfg(test)]
-mod tests {
-    // use super::*;
-
-    // #[test]
-    // fn electro_distance() {
-    //     let agent_radius = 1.0;
-    //     let electro_coeff = 1.0;
-
-    //     let y_unit = geo::coord! {x: 1.0, y: 0.0}.into();
-    //     for y_mag in [10.0, 1.0] {
-    //         let (res_v, res_om) =
-    //             electro_kinematics(y_unit, y_mag, agent_radius, electro_coeff);
-
-    //         assert_eq!(res_om, 0.0);
-    //         assert_eq!(res_v, geo::coord! {x: 0.0, y: 0.0}.into());
-    //     }
-
-    //     let (res_v, res_om) =
-    //         electro_kinematics(y_unit, 0.9, agent_radius, electro_coeff);
-    //     assert_eq!(res_om, 0.0);
-    //     assert_eq!(res_v, geo::coord! {x: -0.031622776601683784, y: 0.0}.into());
-
-    //     let y_unit = geo::coord! {x: -1.0, y: 0.0}.into();
-    //     let (res_v, res_om) =
-    //         electro_kinematics(y_unit, 0.9, agent_radius, electro_coeff);
-    //     assert_eq!(res_om, 0.0);
-    //     assert_eq!(res_v, geo::coord! {x: 0.031622776601683784, y: 0.0}.into());
-    // }
 }

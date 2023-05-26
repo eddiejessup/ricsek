@@ -1,54 +1,41 @@
-use crate::{
-  math::point,
-};
+use nalgebra::{vector, Point2, Vector2};
 
-pub fn stokeslet_u(
-  force: geo::Point,
-  fx: geo::Point,
-  px: geo::Point,
-) -> geo::Point {
-  let x = px - fx;
-  let r = point::point_magnitude(x);
-  (force / r) + (x * (force.dot(x) / r.powi(3)))
+pub fn stokeslet_u(force: Vector2<f64>, fx: Point2<f64>, px: Point2<f64>) -> Vector2<f64> {
+    let x = px - fx;
+    let r = x.magnitude();
+    (force / r) + (x * (force.dot(&x) / r.powi(3)))
+
+    // U(r) = (1 / (8 * π * η)) * (F * r) / |r|^3
 }
 
-pub fn couplet_u(
-  torque: f64,
-  fx: geo::Point,
-  px: geo::Point,
-) -> geo::Point {
-  let x = px - fx;
-  let r = point::point_magnitude(x);
-  geo::Point::new(x.y(), -x.x()) * torque / r.powi(3)
+pub fn rotlet_u(torque: f64, fx: Point2<f64>, px: Point2<f64>) -> Vector2<f64> {
+    let r = px - fx;
+    let rm = r.magnitude();
+    Vector2::new(r.y, -r.x) * torque / rm.powi(3)
 }
 
-pub fn doublet_u(
-  strength: geo::Point,
-  fx: geo::Point,
-  px: geo::Point,
-) -> geo::Point {
-  let x = px - fx;
-  let r = point::point_magnitude(x);
-  -(strength / r.powi(3)) + (x * 3.0 * (strength.dot(x) / r.powi(5)))
+pub fn doublet_u(strength: Vector2<f64>, fx: Point2<f64>, px: Point2<f64>) -> Vector2<f64> {
+    let x = px - fx;
+    let r = x.magnitude();
+    -(strength / r.powi(3)) + (x * 3.0 * (strength.dot(&x) / r.powi(5)))
+}
+
+pub fn vpow(v: Vector2<f64>, n: i32) -> Vector2<f64> {
+    v.map(|x| x.powi(n))
 }
 
 pub fn stresslet_u(
-  stress_diag: geo::Point,
-  stress_off: f64,
-  fx: geo::Point,
-  px: geo::Point,
-) -> geo::Point {
-  let r = px - fx;
-  let rm = point::point_magnitude(r);
+    s_diag: Vector2<f64>,
+    s_off: f64,
+    fx: Point2<f64>,
+    px: Point2<f64>,
+) -> Vector2<f64> {
+    let r = px - fx;
+    let rm_sq = r.magnitude_squared();
 
-  // u_ij = (T_ij * r_j * r_i * r_j) / rm.pow(4) - rm.pow(2) * T_ij;
-  let u_xx = (stress_diag.x() * r.x() * r.x() * r.x()) / rm.powi(4) - rm.powi(2) * stress_diag.x();
-  let u_xy = (stress_off * r.y() * r.x() * r.y()) / rm.powi(4) - rm.powi(2) * stress_off;
-  let u_yx = (stress_off * r.x() * r.y() * r.x()) / rm.powi(4) - rm.powi(2) * stress_off;
-  let u_yy = (stress_diag.y() * r.y() * r.y() * r.y()) / rm.powi(4) - rm.powi(2) * stress_diag.y();
+    let bs = vector!(r, vector!(r.y, r.x))
+        .map(|a| r.component_mul(&vpow(a, 2)))
+        .map(|a| (a / rm_sq.powi(2)).add_scalar(-rm_sq));
 
-  let u_x = u_xx + u_xy;
-  let u_y = u_yx + u_yy;
-
-  geo::Point::new(u_x, u_y)
+    s_diag.component_mul(&bs.x) + s_off * bs.y
 }

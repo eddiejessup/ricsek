@@ -1,3 +1,5 @@
+use nalgebra::{Point2, UnitVector2};
+
 pub struct SimState {
     pub agents: Vec<Agent>,
     pub t: f64,
@@ -5,8 +7,8 @@ pub struct SimState {
 }
 
 pub struct Agent {
-    pub r: geo::Point,
-    pub u: geo::Point,
+    pub r: Point2<f64>,
+    pub u: UnitVector2<f64>,
 }
 
 impl SimState {
