@@ -3,64 +3,80 @@ use std::f64::consts::PI;
 use super::simulation::SimParams;
 
 pub struct PhysicalParams {
+    // Time step.
     pub dt: f64,
+    // System size.
     pub l: f64,
-    // TODO: Derive `ag_f_propulse` and `ag_dipole_strength` from base
-    // quantities.
-    pub ag_f_propulse: f64,
-    pub ag_dipole_strength: f64,
-    pub aspect_ratio: f64,
-    pub temp: f64,
-    pub ag_radius: f64,
-    pub viscosity: f64,
-    pub ag_area_density: f64,
-    pub seg_surface_stiffness: f64,
-}
+    // Stiffness of both agents and surfaces.
+    // (Used to compute the strength of agent-{agent, surface} electrostatics)
+    pub object_stiffness: f64,
+    // Fluid.
+    pub fluid_temperature: f64,
+    pub fluid_viscosity: f64,
+    // Agent shape.
+    pub agent_radius: f64,
+    pub agent_aspect_ratio: f64,
+    // Agent numbers.
+    pub agent_env_area_density: f64,
+    // Agent propulsion.
+    // TODO: Derive all the below from more fundamental parameters.
+    // Force the agent applies to the fluid through its propulsion.
+    // (Used to compute the agent's empty-fluid velocity.)
+    pub agent_propulsion_force: f64,
+    // Force of the dipole the agent creates in the fluid.
+    // (Used to compute the strength of agent-surface hydrodynamics)
+    pub agent_propulsion_dipole_strength: f64,
+    // Force of the stresslet the agent creates in the fluid.
+    // (Used to compute the strength of agent-agent hydrodynamics)
+    pub agent_propulsion_stresslet_force_longitudinal: f64,
+    pub agent_propulsion_stresslet_force_transverse: f64,
+    pub agent_propulsion_stresslet_force_rotational: f64,
+  }
 
 impl PhysicalParams {
-    fn stokes_trans_coeff(&self) -> f64 {
-        6.0 * PI * self.viscosity * self.ag_radius
+    fn agent_stokes_translation_coefficient(&self) -> f64 {
+        6.0 * PI * self.fluid_viscosity * self.agent_radius
     }
 
-    fn stokes_rot_coeff(&self) -> f64 {
-        8.0 * PI * self.viscosity * self.ag_radius.powi(3)
+    fn agent_stokes_rotation_coefficient(&self) -> f64 {
+        8.0 * PI * self.fluid_viscosity * self.agent_radius.powi(3)
     }
 
-    pub fn stokes_trans_mobility(&self) -> f64 {
+    pub fn agent_stokes_translational_mobility(&self) -> f64 {
         // F = 6πηav
-        1.0 / self.stokes_trans_coeff()
+        1.0 / self.agent_stokes_translation_coefficient()
     }
 
-    pub fn stokes_rot_mobility(&self) -> f64 {
+    pub fn agent_stokes_rotational_mobility(&self) -> f64 {
         // T = 8πηa^3ω
-        1.0 / self.stokes_rot_coeff()
+        1.0 / self.agent_stokes_rotation_coefficient()
     }
 
     fn thermal_energy(&self) -> f64 {
-        physical_constants::BOLTZMANN_CONSTANT * self.temp
+        physical_constants::BOLTZMANN_CONSTANT * self.fluid_temperature
     }
 
-    fn stokes_d_trans(&self) -> f64 {
+    fn agent_stokes_translational_diffusion_coefficient(&self) -> f64 {
         // D = kBT / 6πηa
-        self.thermal_energy() / self.stokes_trans_coeff()
+        self.thermal_energy() / self.agent_stokes_translation_coefficient()
     }
 
-    fn stokes_d_rot(&self) -> f64 {
+    fn agent_stokes_rotational_diffusion_coefficient(&self) -> f64 {
         // Drot = kBT / 8πηa^3
-        self.thermal_energy() / self.stokes_rot_coeff()
+        self.thermal_energy() / self.agent_stokes_rotation_coefficient()
     }
 
-    pub fn force_to_velocity(&self, f: f64) -> f64 {
-        self.stokes_trans_mobility() * f
+    pub fn agent_stokes_force_to_velocity(&self, f: f64) -> f64 {
+        self.agent_stokes_translational_mobility() * f
     }
 
-    pub fn f_hertz_coeff(&self) -> f64 {
+    pub fn agent_object_hertz_force_coefficient(&self) -> f64 {
         // Assume sphere for now.
-        (4.0 / 3.0) * self.seg_surface_stiffness * self.ag_radius.sqrt()
+        (4.0 / 3.0) * self.object_stiffness * self.agent_radius.sqrt()
     }
 
-    pub fn v_hertz_coeff(&self) -> f64 {
-        self.stokes_trans_coeff() * self.f_hertz_coeff()
+    pub fn agent_object_hertz_velocity_coefficient(&self) -> f64 {
+        self.agent_stokes_translation_coefficient() * self.agent_object_hertz_force_coefficient()
     }
 
     pub fn env_area(&self) -> f64 {
@@ -68,7 +84,7 @@ impl PhysicalParams {
     }
 
     pub fn as_params(&self) -> SimParams {
-        // dipole strength per unit viscosity
+        // dipole strength per unit fluid_viscosity
         // I guess like how well the dipole transmits over distance.
         // N m / (Pa s)
         // If we divide by y^2:
@@ -78,23 +94,23 @@ impl PhysicalParams {
         // m^2 / (m s)
         // m / s
         // speed! good.
-        let hydro_k_repulse = 3.0 * self.ag_dipole_strength / (64.0 * PI * self.viscosity);
+        let agent_obstacle_hydro_strength = 3.0 * self.agent_propulsion_dipole_strength / (64.0 * PI * self.fluid_viscosity);
         SimParams {
             dt: self.dt,
             l: self.l,
-            n: (self.ag_area_density * self.env_area()).round() as usize,
-            // Capsule electrostatics.
-            ag_radius: self.ag_radius,
-            hertz_coeff: self.v_hertz_coeff(),
-            // Propulsion.
-            ag_v_propulse: self.force_to_velocity(self.ag_f_propulse),
+            agent_env_n: (self.agent_env_area_density * self.env_area()).round() as usize,
+            agent_radius: self.agent_radius,
+            agent_aspect_ratio: self.agent_aspect_ratio,
+            agent_propulsion_speed: self.agent_stokes_force_to_velocity(self.agent_propulsion_force),
+            agent_translational_diffusion_coefficient: self.agent_stokes_translational_diffusion_coefficient(),
+            agent_rotational_diffusion_coefficient: self.agent_stokes_rotational_diffusion_coefficient(),
+            agent_object_hertz_velocity_coefficient: self.agent_object_hertz_velocity_coefficient(),
+            agent_stresslet_force_longitudinal: self.agent_propulsion_stresslet_force_longitudinal,
+            agent_stresslet_force_transverse: self.agent_propulsion_stresslet_force_transverse,
+            agent_stresslet_force_rotational: self.agent_propulsion_stresslet_force_rotational,
             // Capsule hydrodynamics.
-            hydro_k_repulse,
-            aspect_ratio: self.aspect_ratio,
+            agent_obstacle_hydro_strength,
 
-            // Diffusion.
-            d_trans_diff: self.stokes_d_trans(),
-            d_rot_diff: self.stokes_d_rot(),
         }
     }
 }

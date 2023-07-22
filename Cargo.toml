@@ -23,6 +23,7 @@ rand_distr = "0.4.*"
 derive_more = "0.99.17"
 nalgebra = "0.32.*"
 clap = { version = "4.1.*", features = ["derive", "unicode", "wrap_help", "cargo"] }
+colorgrad = "0.6.2"
 
 [[bin]]
 name = "initialize"

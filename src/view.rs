@@ -1,11 +1,10 @@
 use crate::{
     parameters::SimSetup,
-    state::{Agent, SimState}, math::capsule::Capsule,
+    state::{Agent, SimState},
+    math::capsule::Capsule,
 };
 use bevy::{prelude::*, render::render_resource::PrimitiveTopology, sprite::MaterialMesh2dBundle};
-use nalgebra::{Vector2, Point2};
-
-const PL: f64 = 1000.0;
+use nalgebra::{Point2, Vector2};
 
 pub const TIME_STEP: f64 = 1.0 / 40.0;
 
@@ -14,6 +13,9 @@ pub struct AgentId(pub usize);
 
 #[derive(Component)]
 pub struct AgentDirectionId(pub usize);
+
+#[derive(Resource)]
+pub struct Obstacles(pub Vec<Capsule>);
 
 #[derive(Component)]
 pub struct Movable;
@@ -27,10 +29,23 @@ pub struct ViewState {
 #[derive(Resource)]
 pub struct EnvironmentRes {
     pub l: f64,
+    pub window_size: f64,
+    pub arrow_length_pixels: f64,
 }
 
-#[derive(Resource)]
-pub struct Obstacles(pub Vec<Capsule>);
+impl EnvironmentRes {
+    pub fn transform_coord(&self, sd: f64) -> f32 {
+        (self.l / 2.0 + (self.window_size * sd / self.l)) as f32
+    }
+
+    pub fn transformed_vec3(&self, sd: Point2<f64>, z: f32) -> Vec3 {
+        Vec3::new(self.transform_coord(sd.x), self.transform_coord(sd.y), z)
+    }
+
+    pub fn transformed_vec2(&self, sd: Point2<f64>) -> Vec2 {
+        Vec2::new(self.transform_coord(sd.x), self.transform_coord(sd.y))
+    }
+}
 
 impl ViewState {
     pub fn new() -> Self {
@@ -58,19 +73,11 @@ pub struct SimStates(pub Vec<SimState>);
 #[derive(Resource)]
 pub struct SimSetupRes(pub SimSetup);
 
-pub fn transform_coord(sd: f64, sl: f64) -> f32 {
-    (PL * sd / sl) as f32
+pub fn invert_coord(sd: f32, sl: f64, pl: f64) -> f64 {
+    sl * (sd as f64) / pl
 }
 
-pub fn transform_vec(sd: Point2<f64>, sl: f64, z: f32) -> Vec3 {
-  Vec3::new(transform_coord(sd.x, sl), transform_coord(sd.y, sl), z)
-}
-
-pub fn invert_coord(sd: f32, sl: f64) -> f64 {
-    sl * (sd as f64) / PL
-}
-
-pub fn agent_transform(a: &Agent, l: f64, i: usize, z_offset: f32) -> Transform {
+pub fn agent_transform(env: &EnvironmentRes, a: &Agent, i: usize, z_offset: f32) -> Transform {
     let z = z_offset
         + match i % 5 {
             0 => 0.1,
@@ -81,11 +88,7 @@ pub fn agent_transform(a: &Agent, l: f64, i: usize, z_offset: f32) -> Transform 
             _ => 0.6,
         };
     Transform::IDENTITY
-        .with_translation(Vec3::new(
-            transform_coord(a.r.x, l),
-            transform_coord(a.r.y, l),
-            z,
-        ))
+        .with_translation(env.transformed_vec3(a.r, z))
         .with_rotation(Quat::from_rotation_z(a.u.angle(&Vector2::x()) as f32))
 }
 
@@ -96,6 +99,7 @@ pub fn add_camera(mut commands: Commands) {
 pub fn add_agents(
     mut commands: Commands,
     sim_states: Res<SimStates>,
+    env: Res<EnvironmentRes>,
     sim_setup: Res<SimSetupRes>,
     view_state: Res<ViewState>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -106,8 +110,7 @@ pub fn add_agents(
 
     let sim_setup = &sim_setup.0;
 
-    let l = sim_setup.params.l;
-    let radius = sim_setup.params.ag_radius;
+    let radius = sim_setup.params.agent_radius;
 
     cur_sim_state.agents.iter().enumerate().for_each(|(i, a)| {
         let color = match i % 5 {
@@ -124,14 +127,14 @@ pub fn add_agents(
                 mesh: meshes
                     .add(
                         (shape::Circle {
-                            radius: transform_coord(radius, l),
+                            radius: env.transform_coord(radius),
                             vertices: 10,
                         })
                         .into(),
                     )
                     .into(),
                 material: materials.add(ColorMaterial::from(color)),
-                transform: agent_transform(a, l, i, 0.0),
+                transform: agent_transform(&env, a, i, 0.0),
                 ..default()
             },
             AgentId(i),
@@ -142,7 +145,7 @@ pub fn add_agents(
                 mesh: meshes.add(arrow(1.0)).into(),
                 material: materials.add(ColorMaterial::from(Color::RED)),
                 // Add small amount to 'z' translation to avoid overlap
-                transform: agent_transform(a, l, i, 0.01).with_scale(Vec3::splat(10.0)),
+                transform: agent_transform(&env, a, i, 0.01).with_scale(Vec3::splat(10.0)),
                 ..default()
             },
             AgentId(i),
@@ -154,26 +157,21 @@ pub fn add_agents(
 pub fn add_obstacles(
     mut commands: Commands,
     env: Res<EnvironmentRes>,
-    capsules: Res<Obstacles>,
+    sim_setup: Res<SimSetupRes>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let l = env.l;
     let z: f32 = 0.0;
-    for cap in &capsules.0 {
+    for cap in &sim_setup.0.capsules {
         let centre = cap.centroid();
 
         let cap_shape = Vec2 {
-            x: transform_coord(cap.segment_length(), l),
-            y: transform_coord(cap.width(), l),
+            x: env.transform_coord(cap.segment_length()),
+            y: env.transform_coord(cap.width()),
         };
 
         let transform = Transform::IDENTITY
-            .with_translation(Vec3::new(
-                transform_coord(centre.x, l),
-                transform_coord(centre.y, l),
-                z,
-            ))
+            .with_translation(env.transformed_vec3(centre, z))
             .with_rotation(Quat::from_rotation_z(cap.angle_to_x() as f32));
 
         commands.spawn(MaterialMesh2dBundle {
@@ -186,74 +184,79 @@ pub fn add_obstacles(
             mesh: meshes
                 .add(
                     shape::Circle {
-                        radius: transform_coord(cap.radius, l),
+                        radius: env.transform_coord(cap.radius),
                         vertices: 100,
                     }
                     .into(),
                 )
                 .into(),
             material: materials.add(ColorMaterial::from(Color::YELLOW)),
-            transform: Transform::IDENTITY.with_translation(Vec3::new(
-                transform_coord(cap.segment.start.x, l),
-                transform_coord(cap.segment.start.y, l),
-                z,
-            )),
+            transform: Transform::IDENTITY
+                .with_translation(env.transformed_vec3(cap.start_point(), z)),
             ..default()
         });
         commands.spawn(MaterialMesh2dBundle {
             mesh: meshes
                 .add(
                     shape::Circle {
-                        radius: transform_coord(cap.radius, l),
+                        radius: env.transform_coord(cap.radius),
                         vertices: 100,
                     }
                     .into(),
                 )
                 .into(),
             material: materials.add(ColorMaterial::from(Color::YELLOW)),
-            transform: Transform::IDENTITY.with_translation(Vec3::new(
-                transform_coord(cap.segment.end.x, l),
-                transform_coord(cap.segment.end.y, l),
-                z,
-            )),
+            transform: Transform::IDENTITY
+                .with_translation(env.transformed_vec3(cap.end_point(), z)),
             ..default()
         });
     }
 }
 
-pub fn arrow(ar: f32) -> Mesh {
+pub fn arrow(thickness: f64) -> Mesh {
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
     // Define the vertices of the arrow
-    // 2               4
-    // 1     0         2
-    // 0                   6
-    // 1     1         3
-    // 2               5
-    //
-    //       0 1 2 3 4 5 6 7
+
+    //   y
+    //   ^
+    // 4 |               4
+    // 3 |
+    // 2 |
+    // 1 |     0         2
+    // 0 |                     6
+    // 1 |     1         3
+    // 2 |
+    // 3 |
+    // 4 |               5
+    //    ---------------------> x
+    //         0 1 2 3 4 5 6 7 8
     // References are as looking along the shaft towards the head.
+    let head_width = 4.0;
+    let shaft_length = 4.0;
+    let shaft_width = 0.75;
+    let head_length = 3.0;
     let vertices: Vec<Vec3> = [
-        // bottom-left of shaft.
-        [-0.0, 0.1, 0.0],
-        // bottom-right of shaft.
-        [-0.0, -0.1, 0.0],
-        // top-left of shaft.
-        [0.5, 0.1, 0.0],
-        // top-right of shaft.
-        [0.5, -0.1, 0.0],
-        // top-left of head.
-        [0.5, 0.2, 0.0],
-        // top-right of head.
-        [0.5, -0.2, 0.0],
-        // head tip.
-        [0.7, 0.0, 0.0],
+        // 0: bottom-left of shaft.
+        [0.0, shaft_width],
+        // 1: bottom-right of shaft.
+        [0.0, -shaft_width],
+        // 2: top-left of shaft.
+        [shaft_length, shaft_width],
+        // 3: top-right of shaft.
+        [shaft_length, -shaft_width],
+        // 4: top-left of head.
+        [shaft_length, head_width],
+        // 5: top-right of head.
+        [shaft_length, -head_width],
+        // 6: head tip.
+        [shaft_length + head_length, 0.0],
     ]
     .iter()
-    .map(|v| {
-        let mut vec3 = Vec3::from(*v);
-        vec3.y *= ar;
-        vec3
+    .map(|v| Vec3 {
+        x: ((v[0]) / (shaft_length + head_length)) as f32,
+        y: (thickness * (v[1]) / (shaft_length + head_length)) as f32,
+        z: 0.0,
     })
     .collect();
 
@@ -292,8 +295,8 @@ pub fn cursor_system(
         eprintln!("Pixel coords: {}/{}", world_position.x, world_position.y);
         eprintln!(
             "Sim coords: {}/{}",
-            invert_coord(world_position.x, env.l),
-            invert_coord(world_position.y, env.l)
+            invert_coord(world_position.x, env.l, env.window_size),
+            invert_coord(world_position.y, env.l, env.window_size)
         );
     }
 }

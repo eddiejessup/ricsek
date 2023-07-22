@@ -2,15 +2,28 @@
 pub struct SimParams {
     pub dt: f64,
     pub l: f64,
-    pub hydro_k_repulse: f64,
-    pub ag_radius: f64,
-    pub aspect_ratio: f64,
-    pub ag_v_propulse: f64,
-    pub d_trans_diff: f64,
-    pub d_rot_diff: f64,
-    pub hertz_coeff: f64,
-    pub n: usize,
-}
+    // Number of agents.
+    pub agent_env_n: usize,
+    // Agent shape.
+    pub agent_radius: f64,
+    pub agent_aspect_ratio: f64,
+    // Agent propulsion.
+    pub agent_propulsion_speed: f64,
+    // Agent thermal noise.
+    pub agent_translational_diffusion_coefficient: f64,
+    pub agent_rotational_diffusion_coefficient: f64,
+    // Agent-agent hydrodynamics.
+    pub agent_stresslet_force_longitudinal: f64,
+    pub agent_stresslet_force_transverse: f64,
+    pub agent_stresslet_force_rotational: f64,
+    // Electrostatic repulsion, used for both agent-agent and agent-surface
+    // interactions.
+    pub agent_object_hertz_velocity_coefficient: f64,
+    // Agent-surface hydrodynamics.
+    // Coefficient determining strength of translational and rotational velocity
+    // induced by agent-surface interactions.
+    pub agent_obstacle_hydro_strength: f64,
+  }
 
 impl SimParams {
     pub fn to_steps(&self, t: f64) -> usize {

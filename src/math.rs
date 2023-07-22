@@ -15,7 +15,7 @@ pub fn linspace_grid(start: f64, stop: f64, n: usize) -> Vec<Point2<f64>> {
         .collect()
 }
 
-pub fn angle_to_x(v: Vector2<f64>) -> f64 {
+pub fn angle_to_x(v: &Vector2<f64>) -> f64 {
     let angle = v.angle(&Vector2::x());
     if v.y < 0.0 {
         2.0 * std::f64::consts::PI - angle

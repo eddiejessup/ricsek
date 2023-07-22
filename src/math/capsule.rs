@@ -1,4 +1,4 @@
-use geo::{coord, Centroid, EuclideanLength};
+use geo::{coord, Centroid, EuclideanLength, Coord};
 use nalgebra::{vector, Point2, Unit, UnitVector2, Vector2};
 
 use super::angle_to_x;
@@ -8,8 +8,12 @@ pub struct Capsule<T = f64>
 where
     T: geo::CoordNum,
 {
-    pub segment: geo::Line<T>,
+    segment: geo::Line<T>,
     pub radius: T,
+}
+
+fn coord_to_point2(c: Coord) -> Point2<f64> {
+    Point2::new(c.x, c.y)
 }
 
 impl Capsule {
@@ -24,8 +28,15 @@ impl Capsule {
     }
 
     pub fn centroid(&self) -> Point2<f64> {
-        let gp = self.segment.centroid();
-        Point2::new(gp.x(), gp.y())
+        coord_to_point2(self.segment.centroid().0)
+    }
+
+    pub fn start_point(&self) -> Point2<f64> {
+        coord_to_point2(self.segment.start)
+    }
+
+    pub fn end_point(&self) -> Point2<f64> {
+        coord_to_point2(self.segment.start)
     }
 
     pub fn length(&self) -> f64 {
@@ -42,7 +53,7 @@ impl Capsule {
 
     pub fn angle_to_x(&self) -> f64 {
         let r = self.segment.end - self.segment.start;
-        angle_to_x(vector!(r.x, r.y))
+        angle_to_x(&vector!(r.x, r.y))
     }
 
     pub fn closest_point(

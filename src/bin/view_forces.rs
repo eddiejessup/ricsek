@@ -14,6 +14,7 @@ struct Samples(Vec<(Point2<f64>, UnitVector2<f64>)>);
 
 fn add_samples(
     mut commands: Commands,
+    env: Res<EnvironmentRes>,
     sim_setup: Res<SimSetupRes>,
     samples: Res<Samples>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -21,19 +22,17 @@ fn add_samples(
 ) {
     let sim_setup = &sim_setup.0;
 
-    let l = sim_setup.params.l;
-
-    let radius = sim_setup.params.ag_radius;
+    let radius = sim_setup.params.agent_radius;
 
     for (r, u) in &samples.0 {
-        let base_pos = Vec2::new(transform_coord(r.x, l), transform_coord(r.y, l));
+        let base_pos = Vec2::new(env.transform_coord(r.x), env.transform_coord(r.y));
 
         // Agent shape (approximated as a circle).
         commands.spawn(MaterialMesh2dBundle {
             mesh: meshes
                 .add(
                     (shape::Circle {
-                        radius: transform_coord(radius, l),
+                        radius: env.transform_coord(radius),
                         vertices: 10,
                     })
                     .into(),
@@ -50,7 +49,7 @@ fn add_samples(
             material: materials.add(ColorMaterial::from(Color::GREEN)),
             transform: Transform::IDENTITY
                 .with_translation(Vec3::new(base_pos.x, base_pos.y, 10.1))
-                .with_rotation(Quat::from_rotation_z(angle_to_x((*u).into_inner()) as f32))
+                .with_rotation(Quat::from_rotation_z(angle_to_x(&(*u).into_inner()) as f32))
                 .with_scale(Vec3::splat(10.0)),
             ..default()
         });
@@ -59,6 +58,7 @@ fn add_samples(
 
 fn add_electro_forces(
     mut commands: Commands,
+    env: Res<EnvironmentRes>,
     sim_setup: Res<SimSetupRes>,
     samples: Res<Samples>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -66,13 +66,11 @@ fn add_electro_forces(
 ) {
     let sim_setup = &sim_setup.0;
 
-    let l = sim_setup.params.l;
-
-    let radius = sim_setup.params.ag_radius;
+    let radius = sim_setup.params.agent_radius;
     let coeff = 10000000.0;
 
     for (r, _u) in &samples.0 {
-        let base_pos = Vec2::new(transform_coord(r.x, l), transform_coord(r.y, l));
+        let base_pos = Vec2::new(env.transform_coord(r.x), env.transform_coord(r.y));
 
         let f = sim_setup
             .capsules
@@ -86,7 +84,7 @@ fn add_electro_forces(
             material: materials.add(ColorMaterial::from(Color::BLUE)),
             transform: Transform::IDENTITY
                 .with_translation(Vec3::new(base_pos.x, base_pos.y, 2.0))
-                .with_rotation(Quat::from_rotation_z(angle_to_x(f) as f32))
+                .with_rotation(Quat::from_rotation_z(angle_to_x(&f) as f32))
                 .with_scale(Vec3::splat(f.magnitude() as f32)),
             ..default()
         });
@@ -96,6 +94,7 @@ fn add_electro_forces(
 fn add_hydro_forces(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    env: Res<EnvironmentRes>,
     sim_setup: Res<SimSetupRes>,
     samples: Res<Samples>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -103,13 +102,11 @@ fn add_hydro_forces(
 ) {
     let sim_setup = &sim_setup.0;
 
-    let l = sim_setup.params.l;
-
     let aspect_ratio = 1.0;
     let coeff = 1.0e-6;
 
     for (r, u) in &samples.0 {
-        let base_pos = Vec2::new(transform_coord(r.x, l), transform_coord(r.y, l));
+        let base_pos = Vec2::new(env.transform_coord(r.x), env.transform_coord(r.y));
 
         let (v, om) = sim_setup
             .capsules
@@ -123,7 +120,7 @@ fn add_hydro_forces(
             material: materials.add(ColorMaterial::from(Color::BLUE)),
             transform: Transform::IDENTITY
                 .with_translation(Vec3::new(base_pos.x, base_pos.y, 2.0))
-                .with_rotation(Quat::from_rotation_z(angle_to_x(v) as f32))
+                .with_rotation(Quat::from_rotation_z(angle_to_x(&v) as f32))
                 .with_scale(Vec3::splat(v.magnitude().ln() as f32)),
             ..default()
         });
@@ -162,6 +159,8 @@ fn main() {
 
     let env = EnvironmentRes {
         l: sim_setup.params.l,
+        window_size: 800.0,
+        arrow_length_pixels: 20.0,
     };
 
     App::new()

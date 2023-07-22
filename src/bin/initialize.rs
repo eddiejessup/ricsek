@@ -10,14 +10,17 @@ fn main() {
     let sim_params_phys = PhysicalParams {
         dt: 0.001,
         l: 200e-6,
-        viscosity: 0.001,
-        ag_f_propulse: 0.5e-12,
-        ag_dipole_strength: 0.5e-18,
-        aspect_ratio: 2.0,
-        ag_radius: 2e-6,
-        ag_area_density: 0.01e12,
-        temp: 300.0,
-        seg_surface_stiffness: 1e15,
+        object_stiffness: 1e15,
+        fluid_temperature: 300.0,
+        fluid_viscosity: 0.001,
+        agent_radius: 2e-6,
+        agent_aspect_ratio: 2.0,
+        agent_env_area_density: 0.01e12,
+        agent_propulsion_force: 0.5e-12,
+        agent_propulsion_dipole_strength: 0.5e-18,
+        agent_propulsion_stresslet_force_longitudinal: 0.0,
+        agent_propulsion_stresslet_force_transverse: 0.0,
+        agent_propulsion_stresslet_force_rotational: 0.0,
     };
     let sim_params = sim_params_phys.as_params();
     println!(
@@ -48,38 +51,40 @@ Computed derived parameters (for info only):
     Rotational diffusion randomisation timescale: {t_rot_diff:.1} s
     System crossing time: {t_cross:.1} s",
         dt = sim_params_phys.dt,
-        temp = sim_params_phys.temp,
+        temp = sim_params_phys.fluid_temperature,
         l = 1e6 * sim_params_phys.l,
-        viscosity = 1e3 * sim_params_phys.viscosity,
-        ag_f_propulse = 1e12 * sim_params_phys.ag_f_propulse,
-        ag_dipole_strength = 1e18 * sim_params_phys.ag_dipole_strength,
-        ag_radius = 1e6 * sim_params_phys.ag_radius,
-        ag_density = 1e-12 * sim_params_phys.ag_area_density,
-        ag_trans_mobility = 1e-6 * sim_params_phys.stokes_trans_mobility(),
-        ag_n = sim_params.n,
-        d_trans_diff = 1e12 * sim_params.d_trans_diff,
-        d_rot_diff = sim_params.d_rot_diff,
-        ag_v_propulse = 1e6 * sim_params.ag_v_propulse,
-        t_rot_diff = std::f64::consts::PI * std::f64::consts::PI / (4.0 * sim_params.d_rot_diff),
-        t_cross = sim_params.l / sim_params.ag_v_propulse,
+        viscosity = 1e3 * sim_params_phys.fluid_viscosity,
+        ag_f_propulse = 1e12 * sim_params_phys.agent_propulsion_force,
+        ag_dipole_strength = 1e18 * sim_params_phys.agent_propulsion_dipole_strength,
+        ag_radius = 1e6 * sim_params_phys.agent_radius,
+        ag_density = 1e-12 * sim_params_phys.agent_env_area_density,
+        ag_trans_mobility = 1e-6 * sim_params_phys.agent_stokes_translational_mobility(),
+        ag_n = sim_params.agent_env_n,
+        d_trans_diff = 1e12 * sim_params.agent_translational_diffusion_coefficient,
+        d_rot_diff = sim_params.agent_rotational_diffusion_coefficient,
+        ag_v_propulse = 1e6 * sim_params.agent_propulsion_speed,
+        t_rot_diff = std::f64::consts::PI * std::f64::consts::PI
+            / (4.0 * sim_params.agent_rotational_diffusion_coefficient),
+        t_cross = sim_params.l / sim_params.agent_propulsion_speed,
     );
 
     let mut rng = rand::thread_rng();
     let r_distr = Uniform::new(-sim_params.l * 0.5, sim_params.l * 0.5);
     let th_distr = Uniform::new(-std::f64::consts::PI, std::f64::consts::PI);
-    let agents = (0..sim_params.n)
+    let agents = (0..sim_params.agent_env_n)
         .map(|_i| Agent {
             r: random_point(&mut rng, r_distr).into(),
             u: Unit::new_normalize(UnitComplex::new(th_distr.sample(&mut rng)) * Vector2::x()),
         })
         .collect();
 
-    let capsule_radius = 20e-6;
-    let capsules = vec![(point![0.0, -0.25], point![0.0, 0.25])]
-        .iter()
-        .map(|(s, e)| (s * sim_params_phys.l / 2.0, e * sim_params_phys.l / 2.0))
-        .map(|(s, e)| Capsule::new(s, e, capsule_radius))
-        .collect();
+    // let capsule_radius = 20e-6;
+    // let capsules = vec![(point![0.0, -0.25], point![0.0, 0.25])]
+    //     .iter()
+    //     .map(|(s, e)| (s * sim_params_phys.l / 2.0, e * sim_params_phys.l / 2.0))
+    //     .map(|(s, e)| Capsule::new(s, e, capsule_radius))
+    //     .collect();
+    let capsules = vec![];
 
     let sim_state = SimState::new(agents);
 

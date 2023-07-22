@@ -5,13 +5,12 @@ use ricsek::view::*;
 
 fn update_agent_position(
     sim_states: Res<SimStates>,
-    sim_setup: Res<SimSetupRes>,
+    env: Res<EnvironmentRes>,
     mut view_state: ResMut<ViewState>,
     mut query_ag: Query<(&mut Transform, &AgentId, Option<&AgentDirectionId>)>,
 ) {
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
-    let l = sim_setup.0.params.l;
 
     println!("Updating positions for agents, to view_i: {}", view_i);
     for (mut transform, agent_id, may_dir) in &mut query_ag {
@@ -19,7 +18,7 @@ fn update_agent_position(
             Some(_) => 0.01,
             None => 0.0,
         };
-        *transform = agent_transform(&cur_sim_state.agents[agent_id.0], l, agent_id.0, z_off);
+        *transform = agent_transform(&env, &cur_sim_state.agents[agent_id.0], agent_id.0, z_off);
     }
     view_state.mark_fresh();
 }
@@ -65,6 +64,8 @@ fn main() {
 
     let env = EnvironmentRes {
         l: sim_setup.params.l,
+        window_size: 800.0,
+        arrow_length_pixels: 20.0,
     };
 
     println!("Got {} sim-states", sim_states.len());

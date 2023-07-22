@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle, time::common_conditions::on_timer};
-use nalgebra::{Point2, Vector2, point};
+use nalgebra::{Point2, Vector2};
 use ricsek::{
     dynamics::stokes_solutions::*,
-    math::{angle_to_x, linspace, capsule::Capsule},
+    math::{angle_to_x, capsule::Capsule, linspace},
     view::*,
 };
 
@@ -14,10 +14,19 @@ const L: f64 = 1.0;
 struct Samples(Vec<f64>);
 
 enum SingularityParams {
-    Stokeslet(Vector2<f64>),
-    Doublet(Vector2<f64>),
-    Rotlet(f64),
-    Stresslet(Vector2<f64>, f64),
+    Stokeslet {
+        force: Vector2<f64>,
+    },
+    Doublet {
+        strength: Vector2<f64>,
+    },
+    Rotlet {
+        torque: f64,
+    },
+    Stresslet {
+        stress_diag: Vector2<f64>,
+        stress_off: f64,
+    },
 }
 
 struct Singularity {
@@ -27,13 +36,15 @@ struct Singularity {
 
 impl Singularity {
     fn eval(&self, pr: Point2<f64>) -> Vector2<f64> {
+        let r = pr - self.point;
         match self.params {
-            SingularityParams::Stokeslet(f) => stokeslet_u(f, self.point, pr),
-            SingularityParams::Doublet(f) => doublet_u(f, self.point, pr),
-            SingularityParams::Rotlet(f) => rotlet_u(f, self.point, pr),
-            SingularityParams::Stresslet(stress_diag, stress_off) => {
-                stresslet_u(stress_diag, stress_off, self.point, pr)
-            }
+            SingularityParams::Stokeslet { force } => stokeslet_u(force, r),
+            SingularityParams::Doublet { strength } => doublet_u(strength, r),
+            SingularityParams::Rotlet { torque } => rotlet_u(torque, r),
+            SingularityParams::Stresslet {
+                stress_diag,
+                stress_off,
+            } => stresslet_u(stress_diag, stress_off, r),
         }
     }
 }
@@ -44,9 +55,11 @@ struct SingularitySet(Vec<Singularity>);
 fn add_samples(
     mut commands: Commands,
     samples: Res<Samples>,
+    env: Res<EnvironmentRes>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
+    // Point as circle.
     for x in &samples.0 {
         for y in &samples.0 {
             let r = Point2::new(*x, *y);
@@ -62,7 +75,7 @@ fn add_samples(
                     )
                     .into(),
                 material: materials.add(ColorMaterial::from(Color::RED)),
-                transform: Transform::IDENTITY.with_translation(transform_vec(r, L, 1.0)),
+                transform: Transform::IDENTITY.with_translation(env.transformed_vec3(r, 1.0)),
                 ..default()
             });
         }
@@ -72,6 +85,7 @@ fn add_samples(
 fn add_flow(
     mut commands: Commands,
     samples: Res<Samples>,
+    env: Res<EnvironmentRes>,
     singularities: Res<SingularitySet>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -89,96 +103,111 @@ fn add_flow(
                 )
                 .into(),
             material: materials.add(ColorMaterial::from(Color::PURPLE)),
-            transform: Transform::IDENTITY.with_translation(transform_vec(s.point, L, 3.0)),
+            transform: Transform::IDENTITY.with_translation(env.transformed_vec3(s.point, 3.0)),
             ..default()
         });
     }
 
+    // Accumulate vector of (p, v) pairs.
+    let mut sample_evals: Vec<(Point2<f64>, Vector2<f64>)> = Vec::new();
     for x in &samples.0 {
         for y in &samples.0 {
             let pr = Point2::new(*x, *y);
-            let base_pos = Vec2::new(transform_coord(pr.x, L), transform_coord(pr.y, L));
-
             let v = singularities.0.iter().map(|s| s.eval(pr)).sum();
-
-            // Velocity field.
-            commands.spawn(MaterialMesh2dBundle {
-                mesh: meshes.add(arrow(0.5)).into(),
-                material: materials.add(ColorMaterial::from(Color::BLUE)),
-                transform: Transform::IDENTITY
-                    .with_translation(Vec3::new(base_pos.x, base_pos.y, 2.0))
-                    .with_rotation(Quat::from_rotation_z(angle_to_x(v) as f32))
-                    .with_scale(Vec3::splat(v.magnitude().min(30.0) as f32)),
-                ..default()
-            });
+            sample_evals.push((pr, v));
         }
+    }
+
+    // Get maximum velocity magnitude.
+    let max_vel_log = sample_evals
+        .iter()
+        .map(|(_, v)| v.magnitude().log10())
+        .fold(0.0, |a: f64, b: f64| a.max(b));
+
+    let g = colorgrad::viridis();
+
+    // Iterate over (p, v) pairs to draw them.
+    for (p, v) in &sample_evals {
+        // Get a magnitude in [0.0, 1.0] normalized on the max velocity, on a log scale.
+        let vm_norm_log = (v.magnitude().log10() - max_vel_log) / -max_vel_log;
+
+        // Map normalized velocity to a point on the color spectrum.
+        let c_arr_64: [f64; 4] = g.at(vm_norm_log).to_array();
+        let c_arr_32: [f32; 4] = [
+            c_arr_64[0] as f32,
+            c_arr_64[1] as f32,
+            c_arr_64[2] as f32,
+            c_arr_64[3] as f32,
+        ];
+
+        let base_pos = env.transformed_vec2(*p);
+        commands.spawn(MaterialMesh2dBundle {
+            mesh: meshes.add(arrow(0.5)).into(),
+            material: materials.add(ColorMaterial::from(Color::from(c_arr_32))),
+            transform: Transform::IDENTITY
+                .with_translation(Vec3::new(base_pos.x, base_pos.y, 2.0))
+                .with_rotation(Quat::from_rotation_z(angle_to_x(v) as f32))
+                .with_scale(Vec3::splat(env.arrow_length_pixels as f32)),
+            ..default()
+        });
     }
 }
 
 fn main() {
-    let samples = Samples(linspace(-L, L, 120));
-    let env = EnvironmentRes { l: L };
+    let env = EnvironmentRes {
+        l: L,
+        window_size: 1500.0,
+        arrow_length_pixels: 10.0,
+    };
 
-    // // Read force parameters from command line.
-    // let force_params = command!() // requires `cargo` feature
-    //   .arg(arg!([name] "Optional name to operate on"))
-    //   .arg(
-    //       arg!(
-    //           -c --config <FILE> "Sets a custom config file"
-    //       )
-    //       // We don't have syntax yet for optional options, so manually calling `required`
-    //       .required(false)
-    //       .value_parser(value_parser!(PathBuf)),
-    //   )
-    //   .arg(arg!(
-    //       -d --debug ... "Turn debugging information on"
-    //   ))
-    //   .subcommand(
-    //       Command::new("test")
-    //           .about("does testing things")
-    //           .arg(arg!(-l --list "lists test values").action(ArgAction::SetTrue)),
-    //   )
-    //   .get_matches();
+    let n_arrows = (env.window_size / (2.0 * env.arrow_length_pixels)) as usize;
 
-    let dir = 3.0 * Vector2::new(0.8, 0.2);
+    let samples = Samples(linspace(-env.l / 2.0, env.l / 2.0, n_arrows));
+
     let singularities = SingularitySet(vec![
+        // // Top-left corner: two stresslets making a stresslet 'manually'.
+        // Singularity {
+        //     point: Point2::new(-0.25, 0.25),
+        //     params: SingularityParams::Stokeslet {
+        //         force: 20.0 * Vector2::new(1.0, 0.0),
+        //     },
+        // },
+        // Singularity {
+        //     point: Point2::new(-0.25 + 0.03, 0.25),
+        //     params: SingularityParams::Stokeslet {
+        //         force: 20.0 * Vector2::new(-1.0, 0.0),
+        //     },
+        // },
+        // Top-right corner: a stresslet
         Singularity {
-            point: Point2::new(-0.2, 0.0),
-            params: SingularityParams::Stokeslet(dir),
+            point: Point2::new(0.25, 0.25),
+            params: SingularityParams::Stresslet {
+                stress_diag: Vector2::new(1.0, -1.0),
+                stress_off: 0.0,
+            },
         },
-        Singularity {
-            point: Point2::new(0.2, 0.0),
-            params: SingularityParams::Stokeslet(-dir),
-        },
-
+        // // Bottom-left corner: a doublet
         // Singularity {
-        //     point: Point2::new(-0.3, 0.0),
-        //     params: SingularityParams::Stresslet(Vector2::new(-10.0, 10.0), 10.0),
+        //     point: Point2::new(-0.25, -0.25),
+        //     params: SingularityParams::Doublet {
+        //         strength: Vector2::new(1.0, 0.0),
+        //     },
         // },
+        // // Bottom-right corner: a rotlet
         // Singularity {
-        //     point: Point2::new(0.3, 0.0),
-        //     params: SingularityParams::Stresslet(-Vector2::new(-10.0, 10.0), 10.0),
-        // },
-        // Singularity {
-        //     point: Point2::new(0.5, 0.0),
-        //     params: SingularityParams::Stokeslet(Vector2::new(-1.0, 1.0)),
-        // },
-        // Singularity {
-        //     point: Point2::new(-0.3, 0.3),
-        //     params: SingularityParams::Doublet(Vector2::new(-0.5, 0.3)),
-        // },
-        // Singularity {
-        //     point: Point2::new(-0.3, -0.3),
-        //     params: SingularityParams::Rotlet(0.5),
+        //     point: Point2::new(0.25, -0.25),
+        //     params: SingularityParams::Rotlet { torque: 1.0 },
         // },
     ]);
 
     let capsule_radius = 0.005;
-    let capsules: Vec<Capsule> = vec![(point![0.0, -0.25], point![0.0, 0.25])]
-        .iter()
-        .map(|(s, e)| (s * L / 2.0, e * L / 2.0))
-        .map(|(s, e)| Capsule::new(s, e, capsule_radius))
-        .collect();
+    let capsules: Vec<Capsule> = vec![
+        // (point![0.0, -0.25], point![0.0, 0.25])
+    ]
+    .iter()
+    .map(|(s, e): &(Point2<f64>, Point2<f64>)| (s * L / 2.0, e * L / 2.0))
+    .map(|(s, e)| Capsule::new(s, e, capsule_radius))
+    .collect();
 
     App::new()
         .add_plugins(DefaultPlugins)

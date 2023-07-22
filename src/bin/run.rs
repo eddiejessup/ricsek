@@ -1,11 +1,11 @@
 use nalgebra::Rotation2;
 use rand_distr::{Distribution, Normal};
-use ricsek::dynamics::agent::agent_agents_electro;
+use ricsek::dynamics::agent::{agent_agents_electro, agent_agents_hydro};
 use ricsek::dynamics::boundary::wrap;
 use ricsek::dynamics::brownian::{rot_brownian_distr, trans_brownian_distr};
 use ricsek::dynamics::obstacle::agent_obstacles_kinematics;
 use ricsek::math::capsule::Capsule;
-use ricsek::math::point::{random_vector};
+use ricsek::math::point::random_vector;
 use ricsek::parameters::{simulation::SimParams, RunParams};
 use ricsek::state::*;
 
@@ -24,18 +24,34 @@ pub fn update(
         let (mut v, om) = agent_obstacles_kinematics(
             agent,
             capsules,
-            sim_params.ag_radius,
-            sim_params.aspect_ratio,
-            sim_params.hydro_k_repulse,
-            sim_params.hertz_coeff,
+            sim_params.agent_radius,
+            sim_params.agent_aspect_ratio,
+            sim_params.agent_obstacle_hydro_strength,
+            sim_params.agent_object_hertz_velocity_coefficient,
         );
 
         // Agent-agent electrostatic force.
-        let v_agents = agent_agents_electro(i, &agent.r, &agent_rs, sim_params.ag_radius, sim_params.hertz_coeff);
-        v += v_agents;
+        let v_agents_electro = agent_agents_electro(
+            i,
+            agent.r,
+            &agent_rs,
+            sim_params.agent_radius,
+            sim_params.agent_object_hertz_velocity_coefficient,
+        );
+        v += v_agents_electro;
+
+        // Agent-agent hydrodynamic force.
+        let v_agents_hydro = agent_agents_hydro(
+            i,
+            agent.r,
+            &agent_rs,
+            nalgebra::vector!(sim_params.agent_stresslet_force_longitudinal, sim_params.agent_stresslet_force_transverse),
+            sim_params.agent_stresslet_force_rotational,
+        );
+        v += v_agents_hydro;
 
         // Agent propulsion.
-        v += agent.u.into_inner() * sim_params.ag_v_propulse;
+        v += agent.u.into_inner() * sim_params.agent_propulsion_speed;
 
         // Update agent position from velocity.
         agent.r += v * sim_params.dt;
@@ -50,9 +66,7 @@ pub fn update(
         dth += &rot_diff_distr.sample(rng);
         // Perform the rotation.
         agent.u = Rotation2::new(dth) * agent.u;
-    };
-
-
+    }
 
     // Upate time and step.
     sim_state.t += sim_params.dt;
@@ -65,8 +79,8 @@ pub fn run(
     mut sim_state: SimState,
     run_params: RunParams,
 ) {
-    let trans_diff_distr = trans_brownian_distr(sim_params.d_trans_diff, sim_params.dt);
-    let rot_diff_distr = rot_brownian_distr(sim_params.d_rot_diff, sim_params.dt);
+    let trans_diff_distr = trans_brownian_distr(sim_params.agent_translational_diffusion_coefficient, sim_params.dt);
+    let rot_diff_distr = rot_brownian_distr(sim_params.agent_rotational_diffusion_coefficient, sim_params.dt);
 
     let rng = &mut rand::thread_rng();
 
