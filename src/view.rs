@@ -70,7 +70,7 @@ impl ViewState {
 pub struct SimStates(pub Vec<SimState>);
 
 #[derive(Resource)]
-pub struct ConfigRes(pub SetupConfig);
+pub struct SetupRes(pub SetupConfig);
 
 pub fn invert_coord(sd: f32, sl: f64, pl: f64) -> f64 {
     sl * (sd as f64) / pl
@@ -99,7 +99,7 @@ pub fn add_agents(
     mut commands: Commands,
     sim_states: Res<SimStates>,
     env: Res<EnvironmentRes>,
-    config: Res<ConfigRes>,
+    config: Res<SetupRes>,
     view_state: Res<ViewState>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -156,7 +156,7 @@ pub fn add_agents(
 pub fn add_obstacles(
     mut commands: Commands,
     env: Res<EnvironmentRes>,
-    config: Res<ConfigRes>,
+    config: Res<SetupRes>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {

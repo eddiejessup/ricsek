@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use bevy::{prelude::*, time::common_conditions::on_timer};
 use ricsek::view::*;
+use structopt::StructOpt;
 
 fn update_agent_position(
     sim_states: Res<SimStates>,
@@ -55,33 +56,62 @@ fn run_if_step_stale(view_state: Res<ViewState>) -> bool {
     view_state.is_stale()
 }
 
+#[derive(Debug, StructOpt)]
+#[structopt(name = "ricsek_view", about = "View a run results...")]
+pub struct ViewCli {
+    #[structopt(short = "w", long = "window-size", default_value = "800.0")]
+    pub window_size: f64,
+
+    #[structopt(short = "r", long = "run_id")]
+    pub run_id: Option<usize>,
+}
+
 fn main() {
+    let args = ViewCli::from_args();
+
     let conn = &mut ricsek::db::establish_connection();
 
-    let run_id = ricsek::db::read_latest_run_id(conn);
-    let config = ricsek::db::read_run(conn, run_id);
+    let run_id = match args.run_id {
+        Some(run_id) => run_id,
+        None => {
+            println!("No run_id specified, using latest run_id");
+            ricsek::db::read_latest_run_id(conn)
+        }
+    };
+
+    let setup = ricsek::db::read_run(conn, run_id);
     let sim_states = ricsek::db::read_run_sim_states(conn, run_id);
 
     let env = EnvironmentRes {
-        l: config.parameters.sim_params.l,
-        window_size: 800.0,
+        l: setup.parameters.sim_params.l,
+        window_size: args.window_size,
         arrow_length_pixels: 20.0,
     };
 
     println!("Got {} sim-states", sim_states.len());
 
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                resolution: bevy::window::WindowResolution::new(
+                    args.window_size as f32,
+                    args.window_size as f32,
+                ),
+                ..default()
+            }),
+            ..default()
+        }))
         .insert_resource(env)
         .insert_resource(SimStates(sim_states))
-        .insert_resource(ConfigRes(config))
+        .insert_resource(SetupRes(setup))
         .insert_resource(ViewState::new())
-        .add_startup_system(add_obstacles)
-        .add_startup_system(add_camera)
-        .add_startup_system(add_agents)
-        .add_system(change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))))
-        .add_system(update_agent_position.run_if(run_if_step_stale))
-        .add_system(bevy::window::close_on_esc)
+        .add_systems(Startup, (add_obstacles, add_camera, add_agents))
+        .add_systems(
+            Update,
+            change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
+        )
+        .add_systems(Update, update_agent_position.run_if(run_if_step_stale))
+        .add_systems(Update, bevy::window::close_on_esc)
         .run();
 
     println!("Done!");

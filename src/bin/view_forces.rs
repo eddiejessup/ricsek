@@ -15,7 +15,7 @@ struct Samples(Vec<(Point2<f64>, UnitVector2<f64>)>);
 fn add_samples(
     mut commands: Commands,
     env: Res<EnvironmentRes>,
-    config: Res<ConfigRes>,
+    config: Res<SetupRes>,
     samples: Res<Samples>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -59,7 +59,7 @@ fn add_samples(
 fn add_electro_forces(
     mut commands: Commands,
     env: Res<EnvironmentRes>,
-    config: Res<ConfigRes>,
+    config: Res<SetupRes>,
     samples: Res<Samples>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -95,7 +95,7 @@ fn add_hydro_forces(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     env: Res<EnvironmentRes>,
-    config: Res<ConfigRes>,
+    config: Res<SetupRes>,
     samples: Res<Samples>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -165,7 +165,7 @@ fn main() {
 
     App::new()
         .add_plugins(DefaultPlugins)
-        .insert_resource(ConfigRes(config))
+        .insert_resource(SetupRes(config))
         .insert_resource(env)
         .insert_resource(samples)
         .add_startup_system(add_obstacles)

@@ -15,8 +15,6 @@ pub struct RunCli {
     pub run_id: Option<usize>,
 }
 
-impl RunCli {}
-
 fn main() {
     let args = RunCli::from_args();
 
