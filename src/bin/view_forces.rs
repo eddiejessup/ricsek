@@ -150,7 +150,11 @@ fn main() {
 
     let u = UnitVector2::new_normalize(vector!(0.9, -0.435));
 
-    let rs = linspace_grid(-config.parameters.sim_params.l, config.parameters.sim_params.l, 100);
+    let rs = linspace_grid(
+        -config.parameters.sim_params.l,
+        config.parameters.sim_params.l,
+        100,
+    );
     let samples = Samples(rs.iter().map(|r| (*r, u)).collect());
 
     // let samples = Samples(vec![
@@ -168,13 +172,23 @@ fn main() {
         .insert_resource(SetupRes(config))
         .insert_resource(env)
         .insert_resource(samples)
-        .add_startup_system(add_obstacles)
-        .add_startup_system(add_samples)
-        .add_startup_system(add_electro_forces)
-        .add_startup_system(add_hydro_forces)
-        .add_startup_system(add_camera)
-        .add_system(bevy::window::close_on_esc)
-        .add_system(cursor_system.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))))
+        .add_systems(
+            Startup,
+            (
+                add_obstacles,
+                add_samples,
+                add_electro_forces,
+                add_hydro_forces,
+                add_camera,
+            ),
+        )
+        .add_systems(
+            Update,
+            (
+                bevy::window::close_on_esc,
+                cursor_system.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
+            ),
+        )
         .run();
 
     println!("Done!");

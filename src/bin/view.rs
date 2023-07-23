@@ -108,10 +108,12 @@ fn main() {
         .add_systems(Startup, (add_obstacles, add_camera, add_agents))
         .add_systems(
             Update,
-            change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
+            (
+                change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
+                update_agent_position.run_if(run_if_step_stale),
+                bevy::window::close_on_esc,
+            ),
         )
-        .add_systems(Update, update_agent_position.run_if(run_if_step_stale))
-        .add_systems(Update, bevy::window::close_on_esc)
         .run();
 
     println!("Done!");
