@@ -2,6 +2,8 @@ use std::f64::consts::PI;
 
 use super::simulation::SimParams;
 
+// Derive JSON deserialize for PhysicalParams.
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct PhysicalParams {
     // Time step.
     pub dt: f64,
@@ -16,8 +18,6 @@ pub struct PhysicalParams {
     // Agent shape.
     pub agent_radius: f64,
     pub agent_aspect_ratio: f64,
-    // Agent numbers.
-    pub agent_env_area_density: f64,
     // Agent propulsion.
     // TODO: Derive all the below from more fundamental parameters.
     // Force the agent applies to the fluid through its propulsion.
@@ -79,10 +79,6 @@ impl PhysicalParams {
         self.agent_stokes_translation_coefficient() * self.agent_object_hertz_force_coefficient()
     }
 
-    pub fn env_area(&self) -> f64 {
-        self.l.powi(2)
-    }
-
     pub fn as_params(&self) -> SimParams {
         // dipole strength per unit fluid_viscosity
         // I guess like how well the dipole transmits over distance.
@@ -98,7 +94,6 @@ impl PhysicalParams {
         SimParams {
             dt: self.dt,
             l: self.l,
-            agent_env_n: (self.agent_env_area_density * self.env_area()).round() as usize,
             agent_radius: self.agent_radius,
             agent_aspect_ratio: self.agent_aspect_ratio,
             agent_propulsion_speed: self.agent_stokes_force_to_velocity(self.agent_propulsion_force),

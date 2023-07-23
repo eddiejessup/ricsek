@@ -24,8 +24,9 @@ diesel::table! {
     run (id) {
         id -> Int4,
         created_at -> Timestamptz,
-        params -> Jsonb,
-        capsules -> Jsonb,
+        parameters -> Jsonb,
+        obstacles -> Jsonb,
+        agent_initialization -> Jsonb,
     }
 }
 

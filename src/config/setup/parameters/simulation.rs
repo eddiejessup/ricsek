@@ -1,9 +1,7 @@
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct SimParams {
     pub dt: f64,
     pub l: f64,
-    // Number of agents.
-    pub agent_env_n: usize,
     // Agent shape.
     pub agent_radius: f64,
     pub agent_aspect_ratio: f64,

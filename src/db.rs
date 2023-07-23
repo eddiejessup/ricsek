@@ -1,5 +1,4 @@
-use crate::math::capsule::Capsule;
-use crate::parameters::{simulation::*, SimSetup};
+use crate::config::setup::SetupConfig;
 use crate::state::*;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -21,8 +20,7 @@ pub fn establish_connection() -> PgConnection {
 
 pub fn initialize_run(
     conn: &mut PgConnection,
-    sim_params: &SimParams,
-    layout: &Vec<Capsule>,
+    config: &SetupConfig
 ) -> usize {
     use crate::db::schema::run::dsl::*;
     use diesel::dsl::Eq;
@@ -30,8 +28,9 @@ pub fn initialize_run(
         .values((
             None::<Eq<id, i32>>,
             None::<Eq<created_at, time::OffsetDateTime>>,
-            params.eq(serde_json::to_value(sim_params).unwrap()),
-            capsules.eq(serde_json::to_value(layout).unwrap()),
+            parameters.eq(serde_json::to_value(&config.parameters).unwrap()),
+            obstacles.eq(serde_json::to_value(&config.obstacles).unwrap()),
+            agent_initialization.eq(serde_json::to_value(&config.agent_initialization).unwrap()),
         ))
         .returning(id)
         .get_result(conn)
@@ -83,15 +82,16 @@ pub fn read_latest_run_id(conn: &mut PgConnection) -> usize {
     rid as usize
 }
 
-pub fn read_run(conn: &mut PgConnection, rid: usize) -> SimSetup {
+pub fn read_run(conn: &mut PgConnection, rid: usize) -> SetupConfig {
     use schema::run::dsl::*;
     let v = run
         .filter(schema::run::id.eq(rid as i32))
         .get_result::<models::Run>(conn)
         .unwrap();
-    SimSetup {
-        params: serde_json::from_value(v.params).unwrap(),
-        capsules: serde_json::from_value(v.capsules).unwrap(),
+    SetupConfig {
+        parameters: serde_json::from_value(v.parameters).unwrap(),
+        obstacles: serde_json::from_value(v.obstacles).unwrap(),
+        agent_initialization: serde_json::from_value(v.agent_initialization).unwrap(),
     }
 }
 

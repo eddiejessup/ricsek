@@ -1,7 +1,6 @@
 use crate::{
-    parameters::SimSetup,
     state::{Agent, SimState},
-    math::capsule::Capsule,
+    math::capsule::Capsule, config::setup::SetupConfig,
 };
 use bevy::{prelude::*, render::render_resource::PrimitiveTopology, sprite::MaterialMesh2dBundle};
 use nalgebra::{Point2, Vector2};
@@ -71,7 +70,7 @@ impl ViewState {
 pub struct SimStates(pub Vec<SimState>);
 
 #[derive(Resource)]
-pub struct SimSetupRes(pub SimSetup);
+pub struct ConfigRes(pub SetupConfig);
 
 pub fn invert_coord(sd: f32, sl: f64, pl: f64) -> f64 {
     sl * (sd as f64) / pl
@@ -100,7 +99,7 @@ pub fn add_agents(
     mut commands: Commands,
     sim_states: Res<SimStates>,
     env: Res<EnvironmentRes>,
-    sim_setup: Res<SimSetupRes>,
+    config: Res<ConfigRes>,
     view_state: Res<ViewState>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -108,9 +107,9 @@ pub fn add_agents(
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
 
-    let sim_setup = &sim_setup.0;
+    let config = &config.0;
 
-    let radius = sim_setup.params.agent_radius;
+    let radius = config.parameters.sim_params.agent_radius;
 
     cur_sim_state.agents.iter().enumerate().for_each(|(i, a)| {
         let color = match i % 5 {
@@ -157,12 +156,12 @@ pub fn add_agents(
 pub fn add_obstacles(
     mut commands: Commands,
     env: Res<EnvironmentRes>,
-    sim_setup: Res<SimSetupRes>,
+    config: Res<ConfigRes>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     let z: f32 = 0.0;
-    for cap in &sim_setup.0.capsules {
+    for cap in &config.0.obstacles {
         let centre = cap.centroid();
 
         let cap_shape = Vec2 {

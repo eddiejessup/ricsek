@@ -22,3 +22,10 @@ where
 {
     Point2::from(random_vector(rng, distr))
 }
+
+pub fn random_unit_vector<T>(rng: &mut ThreadRng, th_distr: T) -> UnitVector2<f64>
+where
+    T: Distribution<f64>,
+{
+  nalgebra::Unit::new_normalize(nalgebra::UnitComplex::new(th_distr.sample(rng)) * Vector2::x())
+}

@@ -24,6 +24,7 @@ pub struct Agent {
 pub struct Run {
     pub id: i32,
     pub created_at: time::OffsetDateTime,
-    pub params: serde_json::Value,
-    pub capsules: serde_json::Value,
+    pub parameters: serde_json::Value,
+    pub obstacles: serde_json::Value,
+    pub agent_initialization: serde_json::Value,
 }

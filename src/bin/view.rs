@@ -59,11 +59,11 @@ fn main() {
     let conn = &mut ricsek::db::establish_connection();
 
     let run_id = ricsek::db::read_latest_run_id(conn);
-    let sim_setup = ricsek::db::read_run(conn, run_id);
+    let config = ricsek::db::read_run(conn, run_id);
     let sim_states = ricsek::db::read_run_sim_states(conn, run_id);
 
     let env = EnvironmentRes {
-        l: sim_setup.params.l,
+        l: config.parameters.sim_params.l,
         window_size: 800.0,
         arrow_length_pixels: 20.0,
     };
@@ -74,7 +74,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .insert_resource(env)
         .insert_resource(SimStates(sim_states))
-        .insert_resource(SimSetupRes(sim_setup))
+        .insert_resource(ConfigRes(config))
         .insert_resource(ViewState::new())
         .add_startup_system(add_obstacles)
         .add_startup_system(add_camera)

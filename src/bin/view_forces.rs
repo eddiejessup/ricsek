@@ -15,14 +15,14 @@ struct Samples(Vec<(Point2<f64>, UnitVector2<f64>)>);
 fn add_samples(
     mut commands: Commands,
     env: Res<EnvironmentRes>,
-    sim_setup: Res<SimSetupRes>,
+    config: Res<ConfigRes>,
     samples: Res<Samples>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let sim_setup = &sim_setup.0;
+    let config = &config.0;
 
-    let radius = sim_setup.params.agent_radius;
+    let radius = config.parameters.sim_params.agent_radius;
 
     for (r, u) in &samples.0 {
         let base_pos = Vec2::new(env.transform_coord(r.x), env.transform_coord(r.y));
@@ -59,21 +59,21 @@ fn add_samples(
 fn add_electro_forces(
     mut commands: Commands,
     env: Res<EnvironmentRes>,
-    sim_setup: Res<SimSetupRes>,
+    config: Res<ConfigRes>,
     samples: Res<Samples>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let sim_setup = &sim_setup.0;
+    let config = &config.0;
 
-    let radius = sim_setup.params.agent_radius;
+    let radius = config.parameters.sim_params.agent_radius;
     let coeff = 10000000.0;
 
     for (r, _u) in &samples.0 {
         let base_pos = Vec2::new(env.transform_coord(r.x), env.transform_coord(r.y));
 
-        let f = sim_setup
-            .capsules
+        let f = config
+            .obstacles
             .iter()
             .map(|cap| agent_obstacle_electro(*r, cap, radius, coeff))
             .sum();
@@ -95,12 +95,12 @@ fn add_hydro_forces(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     env: Res<EnvironmentRes>,
-    sim_setup: Res<SimSetupRes>,
+    config: Res<ConfigRes>,
     samples: Res<Samples>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let sim_setup = &sim_setup.0;
+    let config = &config.0;
 
     let aspect_ratio = 1.0;
     let coeff = 1.0e-6;
@@ -108,8 +108,8 @@ fn add_hydro_forces(
     for (r, u) in &samples.0 {
         let base_pos = Vec2::new(env.transform_coord(r.x), env.transform_coord(r.y));
 
-        let (v, om) = sim_setup
-            .capsules
+        let (v, om) = config
+            .obstacles
             .iter()
             .map(|cap| agent_obstacle_hydro(*r, *u, cap, aspect_ratio, coeff))
             .fold((zero(), 0.0), |(v, om), (v1, om1)| (v + v1, om + om1));
@@ -146,11 +146,11 @@ fn main() {
     let conn = &mut ricsek::db::establish_connection();
 
     let run_id = ricsek::db::read_latest_run_id(conn);
-    let sim_setup = ricsek::db::read_run(conn, run_id);
+    let config = ricsek::db::read_run(conn, run_id);
 
     let u = UnitVector2::new_normalize(vector!(0.9, -0.435));
 
-    let rs = linspace_grid(-sim_setup.params.l, sim_setup.params.l, 100);
+    let rs = linspace_grid(-config.parameters.sim_params.l, config.parameters.sim_params.l, 100);
     let samples = Samples(rs.iter().map(|r| (*r, u)).collect());
 
     // let samples = Samples(vec![
@@ -158,14 +158,14 @@ fn main() {
     // ]);
 
     let env = EnvironmentRes {
-        l: sim_setup.params.l,
+        l: config.parameters.sim_params.l,
         window_size: 800.0,
         arrow_length_pixels: 20.0,
     };
 
     App::new()
         .add_plugins(DefaultPlugins)
-        .insert_resource(SimSetupRes(sim_setup))
+        .insert_resource(ConfigRes(config))
         .insert_resource(env)
         .insert_resource(samples)
         .add_startup_system(add_obstacles)

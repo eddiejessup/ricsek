@@ -1,0 +1,25 @@
+parameters:
+  type: Physical
+  dt: 0.001
+  l: 200e-6
+  object_stiffness: 1e15
+  fluid_temperature: 300.0
+  fluid_viscosity: 0.001
+  agent_radius: 2e-6
+  agent_aspect_ratio: 2.0
+  agent_env_area_density:
+  agent_propulsion_force: 0.5e-12
+  agent_propulsion_dipole_strength: 0.5e-18
+  agent_propulsion_stresslet_force_longitudinal: 0.0
+  agent_propulsion_stresslet_force_transverse: 0.0
+  agent_propulsion_stresslet_force_rotational: 0.0
+obstacles:
+  - start: [1.2, 3.4]
+    end: [5.6, 7.8]
+    radius: 20e-6
+  - start: [9.1, 2.3]
+    end: [4.5, 6.7]
+    radius: 20e-6
+agent_initialization:
+  type: RandomUniformByAreaNumberDensity
+  area_number_density: 0.01e12
