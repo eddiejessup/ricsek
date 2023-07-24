@@ -5,10 +5,19 @@ use crate::{
 use bevy::{prelude::*, render::render_resource::PrimitiveTopology, sprite::MaterialMesh2dBundle};
 use nalgebra::{Point2, Vector2};
 
-pub const TIME_STEP: f64 = 1.0 / 40.0;
+pub const TIME_STEP: f64 = 1.0 / 160.0;
 
 #[derive(Component)]
 pub struct AgentId(pub usize);
+
+#[derive(Component)]
+pub struct SampleId(pub usize);
+
+#[derive(Component)]
+pub struct SingularityComp;
+
+#[derive(Component)]
+pub struct FlowVectorId;
 
 #[derive(Component)]
 pub struct AgentDirectionId(pub usize);
@@ -24,6 +33,26 @@ pub struct ViewState {
     pub i: usize,
     pub rendered_i: Option<usize>,
 }
+impl ViewState {
+  pub fn new() -> Self {
+      Self {
+          i: 0,
+          rendered_i: None,
+      }
+  }
+
+  pub fn is_stale(&self) -> bool {
+      match self.rendered_i {
+          Some(i) => self.i != i,
+          None => true,
+      }
+  }
+
+  pub fn mark_fresh(&mut self) {
+      self.rendered_i = Some(self.i);
+  }
+}
+
 
 #[derive(Resource)]
 pub struct EnvironmentRes {
@@ -43,26 +72,6 @@ impl EnvironmentRes {
 
     pub fn transformed_vec2(&self, sd: Point2<f64>) -> Vec2 {
         Vec2::new(self.transform_coord(sd.x), self.transform_coord(sd.y))
-    }
-}
-
-impl ViewState {
-    pub fn new() -> Self {
-        Self {
-            i: 0,
-            rendered_i: None,
-        }
-    }
-
-    pub fn is_stale(&self) -> bool {
-        match self.rendered_i {
-            Some(i) => self.i != i,
-            None => true,
-        }
-    }
-
-    pub fn mark_fresh(&mut self) {
-        self.rendered_i = Some(self.i);
     }
 }
 
@@ -298,4 +307,15 @@ pub fn cursor_system(
             invert_coord(world_position.y, env.l, env.window_size)
         );
     }
+}
+
+pub fn increment_step(cur_i: usize, backward: bool, maxi: usize) -> usize {
+  if backward {
+      match cur_i {
+          0 => 0,
+          _ => cur_i - 1,
+      }
+  } else {
+      (cur_i + 1).min(maxi)
+  }
 }

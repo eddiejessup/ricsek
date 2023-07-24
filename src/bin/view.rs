@@ -23,16 +23,6 @@ fn update_agent_position(
     }
     view_state.mark_fresh();
 }
-fn increment_step(cur_i: usize, backward: bool, maxi: usize) -> usize {
-    if backward {
-        match cur_i {
-            0 => 0,
-            _ => cur_i - 1,
-        }
-    } else {
-        (cur_i + 1).min(maxi)
-    }
-}
 
 fn change_view(
     keyboard_input: Res<Input<KeyCode>>,
