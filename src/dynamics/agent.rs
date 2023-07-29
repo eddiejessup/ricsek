@@ -41,7 +41,7 @@ pub fn agent_agents_hydro(
     i1: usize,
     r1: Point2<f64>,
     rs: &[Point2<f64>],
-    s_diag: Vector2<f64>,
+    s_diag: f64,
     s_off: f64,
 ) -> Vector2<f64> {
     rs.iter()

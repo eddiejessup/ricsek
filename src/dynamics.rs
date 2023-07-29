@@ -53,10 +53,7 @@ pub fn update(
             i,
             agent.r,
             &agent_rs,
-            nalgebra::vector!(
-                sim_params.agent_stresslet_force_longitudinal,
-                sim_params.agent_stresslet_force_transverse
-            ),
+            sim_params.agent_stresslet_force_longitudinal,
             sim_params.agent_stresslet_force_rotational,
         );
         v += v_agents_hydro;

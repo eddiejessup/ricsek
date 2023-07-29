@@ -25,7 +25,7 @@ enum SingularityParams {
         torque: f64,
     },
     Stresslet {
-        stress_diag: Vector2<f64>,
+        stress_diag: f64,
         stress_off: f64,
     },
 }
@@ -45,7 +45,9 @@ impl Singularity {
             SingularityParams::Stresslet {
                 stress_diag,
                 stress_off,
-            } => stresslet_u(stress_diag, stress_off, r),
+            // } => stresslet_u(stress_diag, stress_off, r),
+            // } => stresslet_u_2(nalgebra::vector!(stress_diag, 0.0), r),
+            } => stresslet_u_2(nalgebra::vector!(stress_diag, 0.0), r) - stresslet_u(stress_diag, stress_off, r),
         }
     }
 }
@@ -238,7 +240,7 @@ fn adjust_singularity_params(p: &mut SingularityParams, factor: f64) {
             *torque *= factor;
         }
         SingularityParams::Stresslet { stress_diag, .. } => {
-            stress_diag.x *= factor;
+            *stress_diag *= factor;
         }
     }
 }
@@ -288,36 +290,36 @@ fn main() {
     let samples = Samples(samples_2d);
 
     let singularities = Singularities(vec![
-        Singularity {
-            point: Point2::new(0.0, 0.0),
-            params: SingularityParams::Stokeslet {
-                force: 20.0 * Vector2::new(1.0, 0.0),
-            },
-        },
-        Singularity {
-            point: Point2::new(0.0, 0.0),
-            params: SingularityParams::Stresslet {
-                stress_diag: Vector2::new(1.0, -1.0),
-                stress_off: 0.0,
-            },
-        },
+        // Singularity {
+        //     point: Point2::new(0.0, 0.0),
+        //     params: SingularityParams::Stokeslet {
+        //         force: 20.0 * Vector2::new(1.0, 0.0),
+        //     },
+        // },
         Singularity {
             point: Point2::new(0.0, 0.0),
             params: SingularityParams::Stresslet {
-                stress_diag: Vector2::new(-1.0, 1.0),
+                stress_diag: 1.0,
                 stress_off: 0.0,
             },
         },
+        // Singularity {
+        //     point: Point2::new(0.0, 0.0),
+        //     params: SingularityParams::Stresslet {
+        //         stress_diag: -1.0,
+        //         stress_off: 0.0,
+        //     },
+        // },
         Singularity {
             point: Point2::new(0.0, 0.0),
             params: SingularityParams::Doublet {
                 strength: Vector2::new(1.0, 0.0),
             },
         },
-        Singularity {
-            point: Point2::new(0.0, -0.0),
-            params: SingularityParams::Rotlet { torque: 1.0 },
-        },
+        // Singularity {
+        //     point: Point2::new(0.0, -0.0),
+        //     params: SingularityParams::Rotlet { torque: 1.0 },
+        // },
     ]);
 
     App::new()

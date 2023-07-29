@@ -11,7 +11,6 @@ parameters:
   agent_propulsion_force: 0.5e-12
   agent_propulsion_dipole_strength: 0.5e-18
   agent_propulsion_stresslet_force_longitudinal: 0.0
-  agent_propulsion_stresslet_force_transverse: 0.0
   agent_propulsion_stresslet_force_rotational: 0.0
 obstacles:
   - start: [1.2, 3.4]

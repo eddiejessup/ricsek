@@ -101,7 +101,6 @@ impl PhysicalParams {
             agent_rotational_diffusion_coefficient: self.agent_stokes_rotational_diffusion_coefficient(),
             agent_object_hertz_velocity_coefficient: self.agent_object_hertz_velocity_coefficient(),
             agent_stresslet_force_longitudinal: self.agent_propulsion_stresslet_force_longitudinal,
-            agent_stresslet_force_transverse: self.agent_propulsion_stresslet_force_transverse,
             agent_stresslet_force_rotational: self.agent_propulsion_stresslet_force_rotational,
             // Capsule hydrodynamics.
             agent_obstacle_hydro_strength,
