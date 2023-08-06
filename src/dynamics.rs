@@ -1,60 +1,49 @@
 pub mod agent;
 pub mod boundary;
 pub mod brownian;
-pub mod common;
-pub mod obstacle;
+pub mod electro;
 pub mod stokes_solutions;
+
+use std::f64::consts::PI;
 
 use crate::config::run::RunConfig;
 use crate::config::setup::parameters::simulation::SimParams;
 use crate::dynamics::agent::{agent_agents_electro, agent_agents_hydro};
 use crate::dynamics::boundary::wrap;
 use crate::dynamics::brownian::{rot_brownian_distr, trans_brownian_distr};
-use crate::dynamics::obstacle::agent_obstacles_kinematics;
-use crate::math::capsule::Capsule;
 use crate::math::point::random_vector;
 use crate::state::*;
-use nalgebra::Rotation2;
-use rand_distr::{Distribution, Normal};
+use rand_distr::{Normal, Uniform};
 
 pub fn update(
     sim_params: &SimParams,
-    capsules: &[Capsule],
     sim_state: &mut SimState,
     trans_diff_distr: Normal<f64>,
     rot_diff_distr: Normal<f64>,
     rng: &mut rand::rngs::ThreadRng,
 ) {
+    let uniform_theta = Uniform::new(0.0, 2.0 * PI);
+    let uniform_cos_phi = Uniform::new(-1.0, 1.0);
+
     let agent_rs = sim_state.agents.iter().map(|a| a.r).collect::<Vec<_>>();
     for (i, agent) in sim_state.agents.iter_mut().enumerate() {
         // Fluid velocity and rotation.
-        // Segment-agent velocity and rotation.
-        let (mut v, om) = agent_obstacles_kinematics(
-            agent,
-            capsules,
-            sim_params.agent_radius,
-            sim_params.agent_aspect_ratio,
-            sim_params.agent_obstacle_hydro_strength,
-            sim_params.agent_object_hertz_velocity_coefficient,
-        );
-
         // Agent-agent electrostatic force.
-        let v_agents_electro = agent_agents_electro(
+        let mut v = agent_agents_electro(
             i,
             agent.r,
             &agent_rs,
             sim_params.agent_radius,
             sim_params.agent_object_hertz_velocity_coefficient,
         );
-        v += v_agents_electro;
 
         // Agent-agent hydrodynamic force.
         let v_agents_hydro = agent_agents_hydro(
             i,
             agent.r,
             &agent_rs,
-            sim_params.agent_stresslet_force_longitudinal,
-            sim_params.agent_stresslet_force_rotational,
+            agent.u.scale(sim_params.agent_agent_hydro_a),
+            agent.u.scale(sim_params.agent_agent_hydro_b),
         );
         v += v_agents_hydro;
 
@@ -69,11 +58,10 @@ pub fn update(
         // Apply periodic boundary condition.
         wrap(&mut agent.r, sim_params.l);
 
-        let mut dth = om * sim_params.dt;
         // Compute rotational diffusion rotation.
-        dth += &rot_diff_distr.sample(rng);
+        let rot = brownian::random_rotation(rng, &uniform_theta, &uniform_cos_phi, &rot_diff_distr);
         // Perform the rotation.
-        agent.u = Rotation2::new(dth) * agent.u;
+        agent.u = rot * agent.u;
     }
 
     // Upate time and step.
@@ -84,7 +72,6 @@ pub fn update(
 pub fn run(
     conn: &mut diesel::PgConnection,
     sim_params: SimParams,
-    obstacles: Vec<Capsule>,
     mut sim_state: SimState,
     run_params: RunConfig,
 ) {
@@ -102,7 +89,6 @@ pub fn run(
     while sim_state.t < run_params.t_max {
         update(
             &sim_params,
-            &obstacles,
             &mut sim_state,
             trans_diff_distr,
             rot_diff_distr,

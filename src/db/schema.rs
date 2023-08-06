@@ -6,8 +6,10 @@ diesel::table! {
         env_id -> Int4,
         rx -> Float8,
         ry -> Float8,
+        rz -> Float8,
         ux -> Float8,
         uy -> Float8,
+        uz -> Float8,
     }
 }
 

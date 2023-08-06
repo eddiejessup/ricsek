@@ -11,8 +11,8 @@ pub struct SimParams {
     pub agent_translational_diffusion_coefficient: f64,
     pub agent_rotational_diffusion_coefficient: f64,
     // Agent-agent hydrodynamics.
-    pub agent_stresslet_force_longitudinal: f64,
-    pub agent_stresslet_force_rotational: f64,
+    pub agent_agent_hydro_a: f64,
+    pub agent_agent_hydro_b: f64,
     // Electrostatic repulsion, used for both agent-agent and agent-surface
     // interactions.
     pub agent_object_hertz_velocity_coefficient: f64,

@@ -28,9 +28,8 @@ pub struct PhysicalParams {
     pub agent_propulsion_dipole_strength: f64,
     // Force of the stresslet the agent creates in the fluid.
     // (Used to compute the strength of agent-agent hydrodynamics)
-    pub agent_propulsion_stresslet_force_longitudinal: f64,
-    pub agent_propulsion_stresslet_force_transverse: f64,
-    pub agent_propulsion_stresslet_force_rotational: f64,
+    pub agent_agent_hydro_a: f64,
+    pub agent_agent_hydro_b: f64,
   }
 
 impl PhysicalParams {
@@ -79,18 +78,21 @@ impl PhysicalParams {
         self.agent_stokes_translation_coefficient() * self.agent_object_hertz_force_coefficient()
     }
 
+    pub fn agent_obstacle_hydro_strength(&self) -> f64 {
+      // dipole strength per unit fluid_viscosity
+      // I guess like how well the dipole transmits over distance.
+      // N m / (Pa s)
+      // If we divide by y^2:
+      // N / (m Pa s)
+      // N / (m (N/m^2) s)
+      // 1 / (m (1/m^2) s)
+      // m^2 / (m s)
+      // m / s
+      // Units of speed.
+      3.0 * self.agent_propulsion_dipole_strength / (64.0 * PI * self.fluid_viscosity)
+    }
+
     pub fn as_params(&self) -> SimParams {
-        // dipole strength per unit fluid_viscosity
-        // I guess like how well the dipole transmits over distance.
-        // N m / (Pa s)
-        // If we divide by y^2:
-        // N / (m Pa s)
-        // N / (m (N/m^2) s)
-        // 1 / (m (1/m^2) s)
-        // m^2 / (m s)
-        // m / s
-        // speed! good.
-        let agent_obstacle_hydro_strength = 3.0 * self.agent_propulsion_dipole_strength / (64.0 * PI * self.fluid_viscosity);
         SimParams {
             dt: self.dt,
             l: self.l,
@@ -100,10 +102,10 @@ impl PhysicalParams {
             agent_translational_diffusion_coefficient: self.agent_stokes_translational_diffusion_coefficient(),
             agent_rotational_diffusion_coefficient: self.agent_stokes_rotational_diffusion_coefficient(),
             agent_object_hertz_velocity_coefficient: self.agent_object_hertz_velocity_coefficient(),
-            agent_stresslet_force_longitudinal: self.agent_propulsion_stresslet_force_longitudinal,
-            agent_stresslet_force_rotational: self.agent_propulsion_stresslet_force_rotational,
+            agent_agent_hydro_a: self.agent_agent_hydro_a,
+            agent_agent_hydro_b: self.agent_agent_hydro_b,
             // Capsule hydrodynamics.
-            agent_obstacle_hydro_strength,
+            agent_obstacle_hydro_strength: self.agent_obstacle_hydro_strength(),
 
         }
     }

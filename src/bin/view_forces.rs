@@ -175,7 +175,6 @@ fn main() {
         .add_systems(
             Startup,
             (
-                add_obstacles,
                 add_samples,
                 add_electro_forces,
                 add_hydro_forces,

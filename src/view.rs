@@ -1,10 +1,132 @@
 use crate::{
+    config::setup::SetupConfig,
+    math::capsule::Capsule,
     state::{Agent, SimState},
-    math::capsule::Capsule, config::setup::SetupConfig,
 };
-use bevy::{prelude::*, render::render_resource::PrimitiveTopology, sprite::MaterialMesh2dBundle};
-use nalgebra::{Point2, Vector2};
+use bevy::input::mouse::{MouseMotion, MouseWheel};
+use bevy::{pbr::PbrBundle, prelude::*};
+use nalgebra::{Point3, Vector3};
 
+#[derive(Component)]
+pub struct PanOrbitCamera {
+    /// The "focus point" to orbit around. It is automatically updated when panning the camera
+    pub focus: Vec3,
+    pub radius: f32,
+    pub upside_down: bool,
+}
+
+impl Default for PanOrbitCamera {
+    fn default() -> Self {
+        PanOrbitCamera {
+            focus: Vec3::ZERO,
+            radius: 5.0,
+            upside_down: false,
+        }
+    }
+}
+
+pub fn pan_orbit_camera(
+    mut ev_motion: EventReader<MouseMotion>,
+    mut ev_scroll: EventReader<MouseWheel>,
+    input_mouse: Res<Input<MouseButton>>,
+    mut camera_query: Query<(&mut PanOrbitCamera, &mut Transform, &Projection)>,
+    window_query: Query<&Window, With<bevy::window::PrimaryWindow>>,
+) {
+    // change input mapping for orbit and panning here
+    let orbit_button = MouseButton::Right;
+    let pan_button = MouseButton::Middle;
+
+    let mut pan = Vec2::ZERO;
+    let mut rotation_move = Vec2::ZERO;
+    let mut scroll = 0.0;
+    let mut orbit_button_changed = false;
+
+    if input_mouse.pressed(orbit_button) {
+        for ev in ev_motion.iter() {
+            rotation_move += ev.delta;
+        }
+    } else if input_mouse.pressed(pan_button) {
+        // Pan only if we're not rotating at the moment
+        for ev in ev_motion.iter() {
+            pan += ev.delta;
+        }
+    }
+    for ev in ev_scroll.iter() {
+        scroll += ev.y;
+    }
+    if input_mouse.just_released(orbit_button) || input_mouse.just_pressed(orbit_button) {
+        orbit_button_changed = true;
+    }
+
+    for (mut pan_orbit, mut transform, projection) in camera_query.iter_mut() {
+        if orbit_button_changed {
+            // only check for upside down when orbiting started or ended this frame
+            // if the camera is "upside" down, panning horizontally would be inverted, so invert the input to make it correct
+            let up = transform.rotation * Vec3::Y;
+            pan_orbit.upside_down = up.y <= 0.0;
+        }
+
+        let Ok(window) = window_query.get_single() else {
+            return;
+          };
+
+        let mut any = false;
+        if rotation_move.length_squared() > 0.0 {
+            any = true;
+            let window = get_window_size(window);
+            let delta_x = {
+                let delta = rotation_move.x / window.x * std::f32::consts::PI * 2.0;
+                if pan_orbit.upside_down {
+                    -delta
+                } else {
+                    delta
+                }
+            };
+            let delta_y = rotation_move.y / window.y * std::f32::consts::PI;
+            let yaw = Quat::from_rotation_y(-delta_x);
+            let pitch = Quat::from_rotation_x(-delta_y);
+            transform.rotation = yaw * transform.rotation; // rotate around global y axis
+            transform.rotation = transform.rotation * pitch; // rotate around local x axis
+        } else if pan.length_squared() > 0.0 {
+            any = true;
+            // make panning distance independent of resolution and FOV,
+            let window = get_window_size(window);
+            if let Projection::Perspective(projection) = projection {
+                pan *= Vec2::new(projection.fov * projection.aspect_ratio, projection.fov) / window;
+            }
+            // translate by local axes
+            let right = transform.rotation * Vec3::X * -pan.x;
+            let up = transform.rotation * Vec3::Y * pan.y;
+            // make panning proportional to distance away from focus point
+            let translation = (right + up) * pan_orbit.radius;
+            pan_orbit.focus += translation;
+        } else if scroll.abs() > 0.0 {
+            any = true;
+            pan_orbit.radius -= scroll * pan_orbit.radius * 0.2;
+            // dont allow zoom to reach zero or you get stuck
+            pan_orbit.radius = f32::max(pan_orbit.radius, 0.05);
+        }
+
+        if any {
+            // emulating parent/child to make the yaw/y-axis rotation behave like a turntable
+            // parent = x and y rotation
+            // child = z-offset
+            let rot_matrix = Mat3::from_quat(transform.rotation);
+            transform.translation =
+                pan_orbit.focus + rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, pan_orbit.radius));
+        }
+    }
+
+    // consume any remaining events, so they don't pile up if we don't need them
+    // (and also to avoid Bevy warning us about not checking events every frame update)
+    ev_motion.clear();
+}
+
+fn get_window_size(window: &Window) -> Vec2 {
+    Vec2::new(window.width() as f32, window.height() as f32)
+}
+
+// pub const TIME_STEP: f64 = 1.0 / 16.0;
 pub const TIME_STEP: f64 = 1.0 / 160.0;
 
 #[derive(Component)]
@@ -34,44 +156,51 @@ pub struct ViewState {
     pub rendered_i: Option<usize>,
 }
 impl ViewState {
-  pub fn new() -> Self {
-      Self {
-          i: 0,
-          rendered_i: None,
-      }
-  }
+    pub fn new() -> Self {
+        Self {
+            i: 0,
+            rendered_i: None,
+        }
+    }
 
-  pub fn is_stale(&self) -> bool {
-      match self.rendered_i {
-          Some(i) => self.i != i,
-          None => true,
-      }
-  }
+    pub fn is_stale(&self) -> bool {
+        match self.rendered_i {
+            Some(i) => self.i != i,
+            None => true,
+        }
+    }
 
-  pub fn mark_fresh(&mut self) {
-      self.rendered_i = Some(self.i);
-  }
+    pub fn mark_fresh(&mut self) {
+        self.rendered_i = Some(self.i);
+    }
 }
-
 
 #[derive(Resource)]
 pub struct EnvironmentRes {
     pub l: f64,
-    pub window_size: f64,
-    pub arrow_length_pixels: f64,
+    pub arrow_length: f64,
 }
 
 impl EnvironmentRes {
     pub fn transform_coord(&self, sd: f64) -> f32 {
-        (self.l / 2.0 + (self.window_size * sd / self.l)) as f32
+        (sd * 1e6) as f32
     }
 
-    pub fn transformed_vec3(&self, sd: Point2<f64>, z: f32) -> Vec3 {
-        Vec3::new(self.transform_coord(sd.x), self.transform_coord(sd.y), z)
+    pub fn invert_coord(&self, sd: f32) -> f64 {
+        (sd * 1e-6) as f64
     }
 
-    pub fn transformed_vec2(&self, sd: Point2<f64>) -> Vec2 {
-        Vec2::new(self.transform_coord(sd.x), self.transform_coord(sd.y))
+    pub fn transformed_vec3(&self, sd: Point3<f64>) -> Vec3 {
+        let st = sd.map(|x| self.transform_coord(x));
+        Vec3::new(st.x, st.y, st.z)
+    }
+
+    pub fn inverted_vec3(&self, sd: Vec3) -> Point3<f64> {
+        Point3::new(
+            self.invert_coord(sd.x),
+            self.invert_coord(sd.y),
+            self.invert_coord(sd.z),
+        )
     }
 }
 
@@ -85,23 +214,30 @@ pub fn invert_coord(sd: f32, sl: f64, pl: f64) -> f64 {
     sl * (sd as f64) / pl
 }
 
-pub fn agent_transform(env: &EnvironmentRes, a: &Agent, i: usize, z_offset: f32) -> Transform {
-    let z = z_offset
-        + match i % 5 {
-            0 => 0.1,
-            1 => 0.2,
-            2 => 0.3,
-            3 => 0.4,
-            4 => 0.5,
-            _ => 0.6,
-        };
+pub fn nalgebra_to_glam_vec(v: &Vector3<f64>) -> Vec3 {
+    Vec3::new(v.x as f32, v.y as f32, v.z as f32)
+}
+
+pub fn agent_transform(env: &EnvironmentRes, a: &Agent) -> Transform {
     Transform::IDENTITY
-        .with_translation(env.transformed_vec3(a.r, z))
-        .with_rotation(Quat::from_rotation_z(a.u.angle(&Vector2::x()) as f32))
+        .with_translation(env.transformed_vec3(a.r))
+        .with_rotation(Quat::from_rotation_arc(Vec3::X, nalgebra_to_glam_vec(&a.u)))
 }
 
 pub fn add_camera(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    let translation = Vec3::new(0.0, 0.0, 400.0);
+    let radius = translation.length();
+
+    commands.spawn((
+        Camera3dBundle {
+            transform: Transform::from_translation(translation).looking_at(Vec3::ZERO, Vec3::Y),
+            ..default()
+        },
+        PanOrbitCamera {
+            radius,
+            ..Default::default()
+        },
+    ));
 }
 
 pub fn add_agents(
@@ -111,7 +247,7 @@ pub fn add_agents(
     config: Res<SetupRes>,
     view_state: Res<ViewState>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
@@ -131,7 +267,7 @@ pub fn add_agents(
         };
 
         commands.spawn((
-            MaterialMesh2dBundle {
+            PbrBundle {
                 mesh: meshes
                     .add(
                         (shape::Circle {
@@ -141,145 +277,28 @@ pub fn add_agents(
                         .into(),
                     )
                     .into(),
-                material: materials.add(ColorMaterial::from(color)),
-                transform: agent_transform(&env, a, i, 0.0),
+                material: materials.add(StandardMaterial::from(color)),
+                transform: agent_transform(&env, a),
                 ..default()
             },
             AgentId(i),
         ));
 
-        commands.spawn((
-            MaterialMesh2dBundle {
-                mesh: meshes.add(arrow(1.0)).into(),
-                material: materials.add(ColorMaterial::from(Color::RED)),
-                // Add small amount to 'z' translation to avoid overlap
-                transform: agent_transform(&env, a, i, 0.01).with_scale(Vec3::splat(10.0)),
-                ..default()
-            },
-            AgentId(i),
-            AgentDirectionId(i),
-        ));
+        // commands.spawn((
+        //     PbrBundle {
+        //         mesh: meshes.add(arrow(1.0)).into(),
+        //         material: materials.add(StandardMaterial::from(Color::RED)),
+        //         // Add small amount to 'z' translation to avoid overlap
+        //         transform: agent_transform(&env, a).with_scale(Vec3::splat(10.0)),
+        //         ..default()
+        //     },
+        //     AgentId(i),
+        //     AgentDirectionId(i),
+        // ));
     });
 }
 
-pub fn add_obstacles(
-    mut commands: Commands,
-    env: Res<EnvironmentRes>,
-    config: Res<SetupRes>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-) {
-    let z: f32 = 0.0;
-    for cap in &config.0.obstacles {
-        let centre = cap.centroid();
-
-        let cap_shape = Vec2 {
-            x: env.transform_coord(cap.segment_length()),
-            y: env.transform_coord(cap.width()),
-        };
-
-        let transform = Transform::IDENTITY
-            .with_translation(env.transformed_vec3(centre, z))
-            .with_rotation(Quat::from_rotation_z(cap.angle_to_x() as f32));
-
-        commands.spawn(MaterialMesh2dBundle {
-            mesh: meshes.add(shape::Quad::new(cap_shape).into()).into(),
-            material: materials.add(ColorMaterial::from(Color::YELLOW)),
-            transform,
-            ..default()
-        });
-        commands.spawn(MaterialMesh2dBundle {
-            mesh: meshes
-                .add(
-                    shape::Circle {
-                        radius: env.transform_coord(cap.radius),
-                        vertices: 100,
-                    }
-                    .into(),
-                )
-                .into(),
-            material: materials.add(ColorMaterial::from(Color::YELLOW)),
-            transform: Transform::IDENTITY
-                .with_translation(env.transformed_vec3(cap.start_point(), z)),
-            ..default()
-        });
-        commands.spawn(MaterialMesh2dBundle {
-            mesh: meshes
-                .add(
-                    shape::Circle {
-                        radius: env.transform_coord(cap.radius),
-                        vertices: 100,
-                    }
-                    .into(),
-                )
-                .into(),
-            material: materials.add(ColorMaterial::from(Color::YELLOW)),
-            transform: Transform::IDENTITY
-                .with_translation(env.transformed_vec3(cap.end_point(), z)),
-            ..default()
-        });
-    }
-}
-
-pub fn arrow(thickness: f64) -> Mesh {
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-
-    // Define the vertices of the arrow
-
-    //   y
-    //   ^
-    // 4 |               4
-    // 3 |
-    // 2 |
-    // 1 |     0         2
-    // 0 |                     6
-    // 1 |     1         3
-    // 2 |
-    // 3 |
-    // 4 |               5
-    //    ---------------------> x
-    //         0 1 2 3 4 5 6 7 8
-    // References are as looking along the shaft towards the head.
-    let head_width = 4.0;
-    let shaft_length = 4.0;
-    let shaft_width = 0.75;
-    let head_length = 3.0;
-    let vertices: Vec<Vec3> = [
-        // 0: bottom-left of shaft.
-        [0.0, shaft_width],
-        // 1: bottom-right of shaft.
-        [0.0, -shaft_width],
-        // 2: top-left of shaft.
-        [shaft_length, shaft_width],
-        // 3: top-right of shaft.
-        [shaft_length, -shaft_width],
-        // 4: top-left of head.
-        [shaft_length, head_width],
-        // 5: top-right of head.
-        [shaft_length, -head_width],
-        // 6: head tip.
-        [shaft_length + head_length, 0.0],
-    ]
-    .iter()
-    .map(|v| Vec3 {
-        x: ((v[0]) / (shaft_length + head_length)) as f32,
-        y: (thickness * (v[1]) / (shaft_length + head_length)) as f32,
-        z: 0.0,
-    })
-    .collect();
-
-    // Define the indices of the triangles that make up the arrow
-    let indices = bevy::render::mesh::Indices::U32(vec![0, 1, 2, 1, 3, 2, 4, 5, 6]);
-
-    // Add the vertices and indices to the mesh
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-    mesh.set_indices(Some(indices));
-
-    mesh
-}
-
 pub fn cursor_system(
-    env: Res<EnvironmentRes>,
     // need to get window dimensions
     window_query: Query<&Window, With<bevy::window::PrimaryWindow>>,
     // query to get camera transform
@@ -290,32 +309,41 @@ pub fn cursor_system(
     let (camera, camera_transform) = camera_q.single();
 
     let Ok(window) = window_query.get_single() else {
-    return;
-  };
+      return;
+    };
+
+    let camera_loc = camera_transform.translation();
+
+    eprintln!(
+        "Camera loc: {}/{}/{}",
+        camera_loc.x, camera_loc.y, camera_loc.z
+    );
 
     // check if the cursor is inside the window and get its position
     // then, ask bevy to convert into world coordinates, and truncate to discard Z
     if let Some(world_position) = window
         .cursor_position()
         .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
-        .map(|ray| ray.origin.truncate())
+        .map(|ray| ray.origin)
     {
-        eprintln!("Pixel coords: {}/{}", world_position.x, world_position.y);
         eprintln!(
-            "Sim coords: {}/{}",
-            invert_coord(world_position.x, env.l, env.window_size),
-            invert_coord(world_position.y, env.l, env.window_size)
+            "Pixel coords: {}/{}/{}",
+            world_position.x, world_position.y, world_position.z
+        );
+        eprintln!(
+            "Sim coords: {}/{}/{}",
+            world_position.x, world_position.y, world_position.z
         );
     }
 }
 
 pub fn increment_step(cur_i: usize, backward: bool, maxi: usize) -> usize {
-  if backward {
-      match cur_i {
-          0 => 0,
-          _ => cur_i - 1,
-      }
-  } else {
-      (cur_i + 1).min(maxi)
-  }
+    if backward {
+        match cur_i {
+            0 => 0,
+            _ => cur_i - 1,
+        }
+    } else {
+        (cur_i + 1).min(maxi)
+    }
 }

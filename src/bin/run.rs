@@ -43,7 +43,6 @@ fn main() {
     run(
         conn,
         setup.parameters.sim_params,
-        setup.obstacles,
         sim_state,
         run_config,
     );

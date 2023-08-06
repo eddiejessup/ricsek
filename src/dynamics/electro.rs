@@ -1,10 +1,10 @@
-use nalgebra::{UnitVector2, Vector2, zero};
+use nalgebra::{UnitVector3, Vector3, zero};
 
 pub fn electro_kinematics(
-  y_unit: UnitVector2<f64>,
+  y_unit: UnitVector3<f64>,
   overlap: f64,
   electro_coeff: f64,
-) -> Vector2<f64> {
+) -> Vector3<f64> {
   // Electrostatics is only relevant when the objects' surfaces intersect.
   // Otherwise, there is no force.
   if overlap > 0.0 {

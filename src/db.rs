@@ -3,7 +3,7 @@ use crate::state::*;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenvy::dotenv;
-use nalgebra::{Point2, UnitVector2, Vector2};
+use nalgebra::{Point3, UnitVector3, Vector3};
 use std::env;
 use time;
 
@@ -18,10 +18,7 @@ pub fn establish_connection() -> PgConnection {
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }
 
-pub fn initialize_run(
-    conn: &mut PgConnection,
-    config: &SetupConfig
-) -> usize {
+pub fn initialize_run(conn: &mut PgConnection, config: &SetupConfig) -> usize {
     use crate::db::schema::run::dsl::*;
     use diesel::dsl::Eq;
     let run_id: i32 = diesel::insert_into(crate::db::schema::run::table)
@@ -115,8 +112,8 @@ pub fn env_to_sim_state(conn: &mut PgConnection, env: &models::Env) -> SimState 
     let agents: Vec<Agent> = agent_vals
         .iter()
         .map(|a| Agent {
-            r: Point2::new(a.rx, a.ry),
-            u: UnitVector2::new_normalize(Vector2::new(a.ux, a.uy)),
+            r: Point3::new(a.rx, a.ry, a.rx),
+            u: UnitVector3::new_normalize(Vector3::new(a.ux, a.uy, a.uz)),
         })
         .collect();
 

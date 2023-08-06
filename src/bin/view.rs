@@ -95,7 +95,7 @@ fn main() {
         .insert_resource(SimStates(sim_states))
         .insert_resource(SetupRes(setup))
         .insert_resource(ViewState::new())
-        .add_systems(Startup, (add_obstacles, add_camera, add_agents))
+        .add_systems(Startup, (add_camera, add_agents))
         .add_systems(
             Update,
             (

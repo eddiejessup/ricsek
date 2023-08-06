@@ -16,8 +16,10 @@ pub struct Agent {
     pub env_id: i32,
     pub rx: f64,
     pub ry: f64,
+    pub rz: f64,
     pub ux: f64,
     pub uy: f64,
+    pub uz: f64,
 }
 
 #[derive(Queryable)]

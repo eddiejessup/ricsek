@@ -1,6 +1,6 @@
 use crate::math::point::{random_point, random_unit_vector};
 use crate::state::{self, *};
-use nalgebra::{Point2, UnitVector2};
+use nalgebra::{Point3, UnitVector3};
 use rand::distributions::Uniform;
 use rand::rngs::ThreadRng;
 
@@ -9,12 +9,11 @@ use super::{
     AgentNumberConfig,
 };
 
-pub fn random_uniform_orientations(rng: &mut ThreadRng, n: usize) -> Vec<UnitVector2<f64>> {
-    let th_distr = Uniform::new(-std::f64::consts::PI, std::f64::consts::PI);
-    (0..n).map(|_i| random_unit_vector(rng, th_distr)).collect()
+pub fn random_uniform_orientations(rng: &mut ThreadRng, n: usize) -> Vec<UnitVector3<f64>> {
+    (0..n).map(|_i| random_unit_vector(rng)).collect()
 }
 
-pub fn random_uniform_positions(rng: &mut ThreadRng, n: usize, l: f64) -> Vec<Point2<f64>> {
+pub fn random_uniform_positions(rng: &mut ThreadRng, n: usize, l: f64) -> Vec<Point3<f64>> {
     let r_distr = Uniform::new(-l * 0.5, l * 0.5);
     (0..n).map(|_i| random_point(rng, r_distr).into()).collect()
 }
