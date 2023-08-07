@@ -18,16 +18,28 @@ fn wrap1(x: f64, l: f64) -> f64 {
     }
 }
 
-pub fn wrap(r: &mut Point3<f64>, boundaries: &BoundaryConfig) {
-    if !boundaries.0.x.closed {
-      r.x = wrap1(r.x, boundaries.0.x.l);
-    }
-    if !boundaries.0.y.closed {
-      r.y = wrap1(r.y, boundaries.0.y.l);
-    }
-    if !boundaries.0.z.closed {
-      r.z = wrap1(r.z, boundaries.0.z.l);
-    }
+pub fn wrap(r: Point3<f64>, boundaries: &BoundaryConfig) -> Point3<f64> {
+  Point3::new(
+    if boundaries.0.x.closed {
+      r.x
+    } else {
+      wrap1(r.x, boundaries.0.x.l)
+    },
+    if boundaries.0.y.closed {
+      r.y
+    } else {
+      wrap1(r.y, boundaries.0.y.l)
+    },
+    if boundaries.0.z.closed {
+      r.z
+    } else {
+      wrap1(r.z, boundaries.0.z.l)
+    },
+  )
+}
+
+pub fn wrap_vec(r: Vector3<f64>, boundaries: &BoundaryConfig) -> Vector3<f64> {
+  wrap(r.into(), boundaries).coords
 }
 
 pub fn agent_boundary_electro(

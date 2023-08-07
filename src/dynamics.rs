@@ -25,13 +25,18 @@ pub fn update(
     let uniform_cos_phi = Uniform::new(-1.0, 1.0);
 
     let agent_rs = sim_state.agents.iter().map(|a| a.r).collect::<Vec<_>>();
+
     for (i, agent) in sim_state.agents.iter_mut().enumerate() {
+        let r1c_r2cs = agent_rs
+            .iter()
+            .map(|r2| boundary::wrap_vec(r2 - agent.r, &sim_params.boundaries))
+            .collect::<Vec<_>>();
+
         // Fluid velocity and rotation.
         // Agent-agent electrostatic force.
         let mut v = agent_agents_electro(
             i,
-            agent.r,
-            &agent_rs,
+            &r1c_r2cs,
             sim_params.agent_radius,
             sim_params.agent_object_hertz_velocity_coefficient,
         );
@@ -39,8 +44,7 @@ pub fn update(
         // Agent-agent hydrodynamic force.
         v += agent_agents_hydro(
             i,
-            agent.r,
-            &agent_rs,
+            &r1c_r2cs,
             agent.u.scale(sim_params.agent_agent_hydro_a),
             agent.u.scale(sim_params.agent_agent_hydro_b),
         );
@@ -61,7 +65,7 @@ pub fn update(
         agent.r += random_vector(rng, trans_diff_distr);
 
         // Apply periodic boundary condition.
-        boundary::wrap(&mut agent.r, &sim_params.boundaries);
+        agent.r = boundary::wrap(agent.r, &sim_params.boundaries);
 
         // Compute rotational diffusion rotation.
         let rot = brownian::random_rotation(rng, &uniform_theta, &uniform_cos_phi, &rot_diff_distr);
