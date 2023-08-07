@@ -5,7 +5,11 @@ use bevy::{
     time::common_conditions::on_timer,
 };
 use nalgebra::{Point3, Vector3};
-use ricsek::{dynamics::stokes_solutions::*, view::*};
+use ricsek::{
+    config::setup::parameters::simulation::{AxisBoundaryConfig, BoundaryConfig},
+    dynamics::stokes_solutions::*,
+    view::*,
+};
 
 #[derive(Resource)]
 struct Samples(Vec<Point3<f64>>);
@@ -304,11 +308,24 @@ impl ViewState {
 
 fn main() {
     let env = EnvironmentRes {
-        l: Vector3::new(200.0e-6, 200.0e-6, 20.0e-6),
+        boundaries: BoundaryConfig(Vector3::new(
+            AxisBoundaryConfig {
+                l: 200.0e-6,
+                closed: true,
+            },
+            AxisBoundaryConfig {
+                l: 200.0e-6,
+                closed: true,
+            },
+            AxisBoundaryConfig {
+                l: 20.0e-6,
+                closed: true,
+            },
+        )),
         arrow_length: 10.0e-6,
     };
 
-    let samples: Vec<Point3<f64>> = ricsek::math::grid(env.l, 1000);
+    let samples: Vec<Point3<f64>> = ricsek::math::grid(env.boundaries.l(), 1000);
 
     let singularities = vec![
         Singularity {
@@ -335,6 +352,12 @@ fn main() {
             point: Point3::origin(),
             params: SingularityParams::Rotlet {
                 c: Vector3::new(0.0, 1.0, 0.0),
+            },
+        },
+        Singularity {
+            point: Point3::origin(),
+            params: SingularityParams::PotentialDoublet {
+                d: Vector3::new(0.0, 1.0, 0.0),
             },
         },
     ];

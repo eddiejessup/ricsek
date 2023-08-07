@@ -1,8 +1,6 @@
 use std::f64::consts::PI;
 
-use nalgebra::Vector3;
-
-use super::simulation::SimParams;
+use super::simulation::{BoundaryConfig, SimParams};
 
 // Derive JSON deserialize for PhysicalParams.
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -10,7 +8,7 @@ pub struct PhysicalParams {
     // Time step.
     pub dt: f64,
     // System size.
-    pub l: Vector3<f64>,
+    pub boundaries: BoundaryConfig,
     // Stiffness of both agents and surfaces.
     // (Used to compute the strength of agent-{agent, surface} electrostatics)
     pub object_stiffness: f64,
@@ -32,7 +30,7 @@ pub struct PhysicalParams {
     // (Used to compute the strength of agent-agent hydrodynamics)
     pub agent_agent_hydro_a: f64,
     pub agent_agent_hydro_b: f64,
-  }
+}
 
 impl PhysicalParams {
     fn agent_stokes_translation_coefficient(&self) -> f64 {
@@ -81,34 +79,36 @@ impl PhysicalParams {
     }
 
     pub fn agent_obstacle_hydro_strength(&self) -> f64 {
-      // dipole strength per unit fluid_viscosity
-      // I guess like how well the dipole transmits over distance.
-      // N m / (Pa s)
-      // If we divide by y^2:
-      // N / (m Pa s)
-      // N / (m (N/m^2) s)
-      // 1 / (m (1/m^2) s)
-      // m^2 / (m s)
-      // m / s
-      // Units of speed.
-      3.0 * self.agent_propulsion_dipole_strength / (64.0 * PI * self.fluid_viscosity)
+        // dipole strength per unit fluid_viscosity
+        // I guess like how well the dipole transmits over distance.
+        // N m / (Pa s)
+        // If we divide by y^2:
+        // N / (m Pa s)
+        // N / (m (N/m^2) s)
+        // 1 / (m (1/m^2) s)
+        // m^2 / (m s)
+        // m / s
+        // Units of speed.
+        3.0 * self.agent_propulsion_dipole_strength / (64.0 * PI * self.fluid_viscosity)
     }
 
     pub fn as_params(&self) -> SimParams {
         SimParams {
             dt: self.dt,
-            l: self.l,
+            boundaries: self.boundaries.clone(),
             agent_radius: self.agent_radius,
             agent_aspect_ratio: self.agent_aspect_ratio,
-            agent_propulsion_speed: self.agent_stokes_force_to_velocity(self.agent_propulsion_force),
-            agent_translational_diffusion_coefficient: self.agent_stokes_translational_diffusion_coefficient(),
-            agent_rotational_diffusion_coefficient: self.agent_stokes_rotational_diffusion_coefficient(),
+            agent_propulsion_speed: self
+                .agent_stokes_force_to_velocity(self.agent_propulsion_force),
+            agent_translational_diffusion_coefficient: self
+                .agent_stokes_translational_diffusion_coefficient(),
+            agent_rotational_diffusion_coefficient: self
+                .agent_stokes_rotational_diffusion_coefficient(),
             agent_object_hertz_velocity_coefficient: self.agent_object_hertz_velocity_coefficient(),
             agent_agent_hydro_a: self.agent_agent_hydro_a,
             agent_agent_hydro_b: self.agent_agent_hydro_b,
             // Capsule hydrodynamics.
             agent_obstacle_hydro_strength: self.agent_obstacle_hydro_strength(),
-
         }
     }
 }

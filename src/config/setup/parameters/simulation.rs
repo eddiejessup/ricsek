@@ -1,9 +1,29 @@
 use nalgebra::Vector3;
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct AxisBoundaryConfig {
+    pub l: f64,
+    pub closed: bool,
+}
+
+// Newtype around Vector3<AxisBoundaryConfig> for convenience functions.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct BoundaryConfig(pub Vector3<AxisBoundaryConfig>);
+
+impl BoundaryConfig {
+    pub fn l(&self) -> Vector3<f64> {
+        self.0.map(|b| b.l)
+    }
+
+    pub fn l_half(&self) -> Vector3<f64> {
+        self.l() * 0.5
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct SimParams {
     pub dt: f64,
-    pub l: Vector3<f64>,
+    pub boundaries: BoundaryConfig,
     // Agent shape.
     pub agent_radius: f64,
     pub agent_aspect_ratio: f64,
@@ -27,9 +47,5 @@ pub struct SimParams {
 impl SimParams {
     pub fn to_steps(&self, t: f64) -> usize {
         (t / self.dt).ceil() as usize
-    }
-
-    pub fn l_half(&self) -> Vector3<f64> {
-        self.l * 0.5
     }
 }

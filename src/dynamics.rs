@@ -9,7 +9,6 @@ use std::f64::consts::PI;
 use crate::config::run::RunConfig;
 use crate::config::setup::parameters::simulation::SimParams;
 use crate::dynamics::agent::{agent_agents_electro, agent_agents_hydro};
-use crate::dynamics::boundary::wrap;
 use crate::dynamics::brownian::{rot_brownian_distr, trans_brownian_distr};
 use crate::math::point::random_vector;
 use crate::state::*;
@@ -38,17 +37,23 @@ pub fn update(
         );
 
         // Agent-agent hydrodynamic force.
-        let v_agents_hydro = agent_agents_hydro(
+        v += agent_agents_hydro(
             i,
             agent.r,
             &agent_rs,
             agent.u.scale(sim_params.agent_agent_hydro_a),
             agent.u.scale(sim_params.agent_agent_hydro_b),
         );
-        v += v_agents_hydro;
 
         // Agent propulsion.
         v += agent.u.into_inner() * sim_params.agent_propulsion_speed;
+
+        v += boundary::agent_boundary_electro(
+            agent.r,
+            &sim_params.boundaries,
+            sim_params.agent_radius,
+            sim_params.agent_object_hertz_velocity_coefficient,
+        );
 
         // Update agent position from velocity.
         agent.r += v * sim_params.dt;
@@ -56,7 +61,7 @@ pub fn update(
         agent.r += random_vector(rng, trans_diff_distr);
 
         // Apply periodic boundary condition.
-        wrap(&mut agent.r, sim_params.l);
+        boundary::wrap(&mut agent.r, &sim_params.boundaries);
 
         // Compute rotational diffusion rotation.
         let rot = brownian::random_rotation(rng, &uniform_theta, &uniform_cos_phi, &rot_diff_distr);

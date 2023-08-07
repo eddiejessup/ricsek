@@ -78,7 +78,6 @@ Physical parameters:
   Environment:
     Timestep: {dt} s
     Temperature: {temp} K
-    System length (µm): {l}
     Viscosity: {viscosity} mPa·s
 
   Agents:
@@ -91,7 +90,6 @@ Physical parameters:
       Translational mobility: {ag_trans_mobility:.1} (µm/s)/pN",
                     dt = physical_params.dt,
                     temp = physical_params.fluid_temperature,
-                    l = 1e6 * physical_params.l,
                     viscosity = 1e3 * physical_params.fluid_viscosity,
                     ag_f_propulse = 1e12 * physical_params.agent_propulsion_force,
                     ag_dipole_strength = 1e18 * physical_params.agent_propulsion_dipole_strength,
@@ -121,14 +119,14 @@ Simulation parameters:
       Rotational diffusion randomisation timescale: {t_rot_diff:.1} s
       System crossing time (s): {t_cross:.1}",
             dt = sim_params.dt,
-            l = 1e6 * sim_params.l,
+            l = 1e6 * sim_params.boundaries.l(),
             d_trans_diff = 1e12 * sim_params.agent_translational_diffusion_coefficient,
             d_rot_diff = sim_params.agent_rotational_diffusion_coefficient,
             ag_v_propulse = 1e6 * sim_params.agent_propulsion_speed,
             ag_radius = 1e6 * sim_params.agent_radius,
             t_rot_diff = std::f64::consts::PI * std::f64::consts::PI
                 / (4.0 * sim_params.agent_rotational_diffusion_coefficient),
-            t_cross = sim_params.l / sim_params.agent_propulsion_speed,
+            t_cross = sim_params.boundaries.l() / sim_params.agent_propulsion_speed,
         );
     }
 }

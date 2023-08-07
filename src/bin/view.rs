@@ -64,7 +64,7 @@ fn main() {
     let sim_states = ricsek::db::read_run_sim_states(conn, run_id);
 
     let env = EnvironmentRes {
-        l: setup.parameters.sim_params.l,
+        boundaries: setup.parameters.sim_params.boundaries.clone(),
         arrow_length: 20.0e-6,
     };
 

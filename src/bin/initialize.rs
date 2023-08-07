@@ -9,7 +9,7 @@ fn main() {
     let agents = config::setup::agents::initialize_agents(
         &mut rng,
         &config.agent_initialization,
-        sim_params.l,
+        sim_params.boundaries.l(),
     );
     println!("Initialized {} agents", agents.len());
 

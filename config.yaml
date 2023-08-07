@@ -1,10 +1,13 @@
 parameters:
   type: Physical
   dt: 0.001
-  l:
-    - 20e-6
-    - 20e-6
-    - 20e-6
+  boundaries:
+    - l: 20e-6
+      closed: false
+    - l: 20e-6
+      closed: true
+    - l: 20e-6
+      closed: true
   object_stiffness: 1e15
   fluid_temperature: 0.0
   # fluid_temperature: 300.0
