@@ -5,13 +5,13 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "ricsek_run", about = "Run an initialized simulation...")]
 pub struct RunCli {
-    #[structopt(short = "d", long = "dt_view")]
+    #[structopt(short = "d", long = "dt-view")]
     pub dt_view: f64,
 
-    #[structopt(short = "t", long = "t_max")]
+    #[structopt(short = "t")]
     pub t_max: f64,
 
-    #[structopt(short = "r", long = "run_id")]
+    #[structopt(short = "r", long = "run")]
     pub run_id: Option<usize>,
 }
 

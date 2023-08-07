@@ -3,10 +3,6 @@ pub mod parameters;
 
 use std::{error::Error, fs::File, io::Read, path::Path};
 
-use nalgebra::{point, Point2};
-
-use crate::math::capsule::Capsule;
-
 use self::parameters::{physical::PhysicalParams, simulation::SimParams, Parameters};
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -19,7 +15,6 @@ enum ParametersYaml {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ConfigYaml {
     parameters: ParametersYaml,
-    obstacles: Vec<CapsuleYaml>,
     agent_initialization: AgentInitializationConfig,
 }
 
@@ -29,29 +24,21 @@ struct PointYaml {
     y: f64,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct CapsuleYaml {
-    start: Point2<f64>,
-    end: Point2<f64>,
-    radius: f64,
-}
-
 pub struct SetupConfig {
     pub parameters: Parameters,
-    pub obstacles: Vec<crate::math::capsule::Capsule>,
     pub agent_initialization: AgentInitializationConfig,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
 pub enum AgentInitializationConfig {
-    RandomUniformByAreaNumberDensity(AgentAreaNumberDensityConfig),
+    RandomUniformByVolumeNumberDensity(AgentVolumeNumberDensityConfig),
     RandomUniformByNumber(AgentNumberConfig),
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct AgentAreaNumberDensityConfig {
-    pub area_number_density: f64,
+pub struct AgentVolumeNumberDensityConfig {
+    pub volume_number_density: f64,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -77,19 +64,6 @@ impl SetupConfig {
         };
         let config = SetupConfig {
             parameters,
-            obstacles: config_raw
-                .obstacles
-                .iter()
-                .map(
-                    |CapsuleYaml {
-                         start: s,
-                         end: e,
-                         radius,
-                     }| {
-                        Capsule::new(point!(s.x, s.y), point!(e.x, e.y), *radius)
-                    },
-                )
-                .collect(),
             agent_initialization: config_raw.agent_initialization,
         };
         Ok(config)
@@ -104,7 +78,7 @@ Physical parameters:
   Environment:
     Timestep: {dt} s
     Temperature: {temp} K
-    System length: {l} µm
+    System length (µm): {l}
     Viscosity: {viscosity} mPa·s
 
   Agents:
@@ -112,9 +86,9 @@ Physical parameters:
     Dipole strength: {ag_dipole_strength} pN·µm
     Effective radius: {ag_radius} µm
 
-Derived parameters:
-  Agents:
-    Translational mobility: {ag_trans_mobility:.1} (µm/s)/pN",
+  Derived physical parameters:
+    Agents:
+      Translational mobility: {ag_trans_mobility:.1} (µm/s)/pN",
                     dt = physical_params.dt,
                     temp = physical_params.fluid_temperature,
                     l = 1e6 * physical_params.l,
@@ -131,20 +105,21 @@ Derived parameters:
         let sim_params = &self.parameters.sim_params;
         println!(
             "\
-Environment:
-Timestep: {dt} s
-System length: {l} µm
+Simulation parameters:
+  Environment:
+    Timestep: {dt} s
+    System length (µm): {l}
 
-Agents:
-Effective radius: {ag_radius} µm
-Translational diffusion rate: {d_trans_diff:.1} µm^2/s
-Rotational diffusion rate: {d_rot_diff:.1} rad^2/s
-Translational propulsive velocity: {ag_v_propulse:.1} µm/s
+  Agents:
+    Effective radius: {ag_radius} µm
+    Translational diffusion rate: {d_trans_diff:.1} µm^2/s
+    Rotational diffusion rate: {d_rot_diff:.1} rad^2/s
+    Translational propulsive velocity: {ag_v_propulse:.1} µm/s
 
-Computed derived parameters (for info only):
-Agents:
-Rotational diffusion randomisation timescale: {t_rot_diff:.1} s
-System crossing time: {t_cross:.1} s",
+  Derived simulation parameters:
+    Agents:
+      Rotational diffusion randomisation timescale: {t_rot_diff:.1} s
+      System crossing time (s): {t_cross:.1}",
             dt = sim_params.dt,
             l = 1e6 * sim_params.l,
             d_trans_diff = 1e12 * sim_params.agent_translational_diffusion_coefficient,

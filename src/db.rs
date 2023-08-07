@@ -26,7 +26,6 @@ pub fn initialize_run(conn: &mut PgConnection, config: &SetupConfig) -> usize {
             None::<Eq<id, i32>>,
             None::<Eq<created_at, time::OffsetDateTime>>,
             parameters.eq(serde_json::to_value(&config.parameters).unwrap()),
-            obstacles.eq(serde_json::to_value(&config.obstacles).unwrap()),
             agent_initialization.eq(serde_json::to_value(&config.agent_initialization).unwrap()),
         ))
         .returning(id)
@@ -60,8 +59,10 @@ pub fn write_checkpoint(conn: &mut PgConnection, rid: usize, sim_state: &SimStat
                 env_id.eq(eid),
                 rx.eq(a.r.x),
                 ry.eq(a.r.y),
+                rz.eq(a.r.z),
                 ux.eq(a.u.x),
                 uy.eq(a.u.y),
+                uz.eq(a.u.z),
             )
         })
         .collect();
@@ -87,7 +88,6 @@ pub fn read_run(conn: &mut PgConnection, rid: usize) -> SetupConfig {
         .unwrap();
     SetupConfig {
         parameters: serde_json::from_value(v.parameters).unwrap(),
-        obstacles: serde_json::from_value(v.obstacles).unwrap(),
         agent_initialization: serde_json::from_value(v.agent_initialization).unwrap(),
     }
 }
@@ -112,7 +112,7 @@ pub fn env_to_sim_state(conn: &mut PgConnection, env: &models::Env) -> SimState 
     let agents: Vec<Agent> = agent_vals
         .iter()
         .map(|a| Agent {
-            r: Point3::new(a.rx, a.ry, a.rx),
+            r: Point3::new(a.rx, a.ry, a.rz),
             u: UnitVector3::new_normalize(Vector3::new(a.ux, a.uy, a.uz)),
         })
         .collect();

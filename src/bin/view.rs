@@ -7,21 +7,16 @@ use structopt::StructOpt;
 fn update_agent_position(
     sim_states: Res<SimStates>,
     env: Res<EnvironmentRes>,
-    mut view_state: ResMut<ViewState>,
-    mut query_ag: Query<(&mut Transform, &AgentId, Option<&AgentDirectionId>)>,
+    view_state: Res<ViewState>,
+    mut query_ag: Query<(&mut Transform, &AgentId)>,
 ) {
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
 
     println!("Updating positions for agents, to view_i: {}", view_i);
-    for (mut transform, agent_id, may_dir) in &mut query_ag {
-        let z_off = match may_dir {
-            Some(_) => 0.01,
-            None => 0.0,
-        };
-        *transform = agent_transform(&env, &cur_sim_state.agents[agent_id.0], agent_id.0, z_off);
+    for (mut transform, agent_id) in &mut query_ag {
+        *transform = agent_transform(&env, &cur_sim_state.agents[agent_id.0]);
     }
-    view_state.mark_fresh();
 }
 
 fn change_view(
@@ -40,10 +35,6 @@ fn change_view(
     if let Some(backward) = backward {
         view_state.i = increment_step(view_state.i, backward, sim_states.0.len() - 1);
     }
-}
-
-fn run_if_step_stale(view_state: Res<ViewState>) -> bool {
-    view_state.is_stale()
 }
 
 #[derive(Debug, StructOpt)]
@@ -74,34 +65,26 @@ fn main() {
 
     let env = EnvironmentRes {
         l: setup.parameters.sim_params.l,
-        window_size: args.window_size,
-        arrow_length_pixels: 20.0,
+        arrow_length: 20.0e-6,
     };
 
     println!("Got {} sim-states", sim_states.len());
 
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                resolution: bevy::window::WindowResolution::new(
-                    args.window_size as f32,
-                    args.window_size as f32,
-                ),
-                ..default()
-            }),
-            ..default()
-        }))
+        .add_plugins(DefaultPlugins)
         .insert_resource(env)
         .insert_resource(SimStates(sim_states))
         .insert_resource(SetupRes(setup))
         .insert_resource(ViewState::new())
         .add_systems(Startup, (add_camera, add_agents))
+        .add_systems(Startup, add_environment)
+        .add_systems(Update, pan_orbit_camera)
         .add_systems(
             Update,
             (
                 change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
-                update_agent_position.run_if(run_if_step_stale),
                 bevy::window::close_on_esc,
+                update_agent_position,
             ),
         )
         .run();

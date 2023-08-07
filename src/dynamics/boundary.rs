@@ -1,4 +1,4 @@
-use nalgebra::DefaultAllocator;
+use nalgebra::{Vector3, Point3};
 
 fn wrap1(x: f64, l: f64) -> f64 {
     if x < -l * 0.5 {
@@ -14,10 +14,8 @@ fn wrap1(x: f64, l: f64) -> f64 {
     }
 }
 
-pub fn wrap<D>(r: &mut nalgebra::OPoint<f64, D>, l: f64)
-where
-    D: nalgebra::DimName,
-    DefaultAllocator: nalgebra::allocator::Allocator<f64, D>,
-{
-    r.apply(|x| *x = wrap1(*x, l));
+pub fn wrap(r: &mut Point3<f64>, l: Vector3<f64>) {
+    r.x = wrap1(r.x, l.x);
+    r.y = wrap1(r.y, l.y);
+    r.z = wrap1(r.z, l.z);
 }

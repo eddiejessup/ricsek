@@ -4,8 +4,8 @@ use bevy::{
     pbr::PbrBundle, prelude::*, render::view::visibility::Visibility,
     time::common_conditions::on_timer,
 };
-use nalgebra::{vector, Point3, Vector3};
-use ricsek::{dynamics::stokes_solutions::*, math::linspace, view::*};
+use nalgebra::{Point3, Vector3};
+use ricsek::{dynamics::stokes_solutions::*, view::*};
 
 #[derive(Resource)]
 struct Samples(Vec<Point3<f64>>);
@@ -37,12 +37,6 @@ struct Singularity {
     params: SingularityParams,
 }
 
-impl Singularity {
-    fn eval(&self, pr: Point3<f64>) -> Vector3<f64> {
-        self.params.eval(pr - self.point)
-    }
-}
-
 #[derive(Resource)]
 struct Singularities(Vec<Singularity>);
 
@@ -54,15 +48,7 @@ fn add_samples(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let red: Handle<StandardMaterial> = materials.add(StandardMaterial::from(Color::RED));
-    let cube: Handle<Mesh> = meshes
-        .add(
-            (shape::Cube {
-                size: 1.0,
-                // vertices: 10,
-            })
-            .into(),
-        )
-        .into();
+    let cube: Handle<Mesh> = meshes.add((shape::Cube { size: 1.0 }).into()).into();
     for (i, r) in samples.0.iter().enumerate() {
         commands.spawn((
             PbrBundle {
@@ -98,7 +84,9 @@ fn add_flow(
                 .into(),
             ),
             material: materials.add(StandardMaterial::from(Color::PURPLE)),
-            transform: Transform::from_translation(env.transformed_vec3(selected_singularity.point)),
+            transform: Transform::from_translation(
+                env.transformed_vec3(selected_singularity.point),
+            ),
             ..default()
         },
     ));
@@ -246,7 +234,7 @@ fn change_view(
     mut view_state: ResMut<ViewState>,
     singularities: Res<Singularities>,
     mut q_singularity: Query<(&mut Transform, &mut SingularityParams)>,
-  ) {
+) {
     let (mut singularity_transform, mut singularity_params) = q_singularity.single_mut();
 
     let backward = if keyboard_input.just_pressed(KeyCode::Left) {
@@ -264,7 +252,8 @@ fn change_view(
             view_state.i = new_i;
             let new_sing = singularities.0[view_state.i].clone();
             *singularity_params = new_sing.params;
-            *singularity_transform = Transform::from_translation(env.transformed_vec3(new_sing.point));
+            *singularity_transform =
+                Transform::from_translation(env.transformed_vec3(new_sing.point));
         }
     }
 
@@ -287,13 +276,13 @@ fn adjust_singularity_params(p: &mut SingularityParams, factor: f64) {
         SingularityParams::Stokeslet { a } => {
             *a *= factor;
         }
-        SingularityParams::StokesDoublet { a, b } => {
+        SingularityParams::StokesDoublet { a, .. } => {
             *a *= factor;
         }
         SingularityParams::Rotlet { c } => {
             *c *= factor;
         }
-        SingularityParams::Stresslet { a, b } => {
+        SingularityParams::Stresslet { a, .. } => {
             *a *= factor;
         }
         SingularityParams::PotentialDoublet { d } => {
@@ -309,42 +298,19 @@ pub struct ViewState {
 
 impl ViewState {
     pub fn new() -> Self {
-        Self {
-            i: 0,
-        }
+        Self { i: 0 }
     }
-}
-
-fn add_scene(mut commands: Commands) {
-    commands.insert_resource(AmbientLight {
-        color: Color::WHITE,
-        brightness: 0.1,
-    });
 }
 
 fn main() {
     let env = EnvironmentRes {
-        l: 200.0e-6,
-        // arrow_length: 10.0,
+        l: Vector3::new(200.0e-6, 200.0e-6, 20.0e-6),
         arrow_length: 10.0e-6,
-        // arrow_length: 30.0,
     };
 
-    let n_arrows = (env.l / (2.0 * env.arrow_length)) as usize;
+    let samples: Vec<Point3<f64>> = ricsek::math::grid(env.l, 1000);
 
-    let samples_1d = linspace(-env.l / 2.0, env.l / 2.0, n_arrows);
-
-    let mut samples_vec: Vec<Point3<f64>> = Vec::new();
-    for x in &samples_1d {
-        for y in &samples_1d {
-            for z in &samples_1d {
-                samples_vec.push(Point3::new(*x, *y, *z));
-            }
-        }
-    }
-    let samples = Samples(samples_vec);
-
-    let singularities = Singularities(vec![
+    let singularities = vec![
         Singularity {
             point: Point3::origin(),
             params: SingularityParams::Stokeslet {
@@ -371,15 +337,16 @@ fn main() {
                 c: Vector3::new(0.0, 1.0, 0.0),
             },
         },
-    ]);
+    ];
 
     App::new()
         .add_plugins(DefaultPlugins)
-        .insert_resource(samples)
-        .insert_resource(singularities)
         .insert_resource(env)
+        .insert_resource(Samples(samples))
+        .insert_resource(Singularities(singularities))
         .insert_resource(ViewState::new())
-        .add_systems(Startup, (add_samples, add_flow, add_scene, add_camera))
+        .add_systems(Startup, (add_samples, add_flow, add_camera))
+        .add_systems(Startup, add_environment)
         .add_systems(Update, pan_orbit_camera)
         .add_systems(
             Update,

@@ -1,5 +1,7 @@
 use std::f64::consts::PI;
 
+use nalgebra::Vector3;
+
 use super::simulation::SimParams;
 
 // Derive JSON deserialize for PhysicalParams.
@@ -8,7 +10,7 @@ pub struct PhysicalParams {
     // Time step.
     pub dt: f64,
     // System size.
-    pub l: f64,
+    pub l: Vector3<f64>,
     // Stiffness of both agents and surfaces.
     // (Used to compute the strength of agent-{agent, surface} electrostatics)
     pub object_stiffness: f64,

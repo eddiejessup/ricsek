@@ -1,24 +1,30 @@
-use crate::math::point::{random_point, random_unit_vector};
+use crate::math::point::{random_unit_vector, random_vector};
 use crate::state::{self, *};
-use nalgebra::{Point3, UnitVector3};
+use nalgebra::{Point3, UnitVector3, Vector3};
 use rand::distributions::Uniform;
 use rand::rngs::ThreadRng;
 
 use super::{
-    AgentAreaNumberDensityConfig, AgentInitializationConfig, AgentInitializationConfig::*,
-    AgentNumberConfig,
+    AgentInitializationConfig, AgentInitializationConfig::*, AgentNumberConfig,
+    AgentVolumeNumberDensityConfig,
 };
 
 pub fn random_uniform_orientations(rng: &mut ThreadRng, n: usize) -> Vec<UnitVector3<f64>> {
     (0..n).map(|_i| random_unit_vector(rng)).collect()
 }
 
-pub fn random_uniform_positions(rng: &mut ThreadRng, n: usize, l: f64) -> Vec<Point3<f64>> {
-    let r_distr = Uniform::new(-l * 0.5, l * 0.5);
-    (0..n).map(|_i| random_point(rng, r_distr).into()).collect()
+pub fn random_uniform_positions(
+    rng: &mut ThreadRng,
+    n: usize,
+    l: Vector3<f64>,
+) -> Vec<Point3<f64>> {
+    let r_distr = Uniform::new(-0.5, 0.5);
+    (0..n)
+        .map(|_i| random_vector(rng, r_distr).component_mul(&l).into())
+        .collect()
 }
 
-fn random_uniform_agents(rng: &mut ThreadRng, n: usize, l: f64) -> Vec<state::Agent> {
+fn random_uniform_agents(rng: &mut ThreadRng, n: usize, l: Vector3<f64>) -> Vec<state::Agent> {
     let rs = random_uniform_positions(rng, n, l);
     let us = random_uniform_orientations(rng, n);
     (0..n).map(|i| Agent { r: rs[i], u: us[i] }).collect()
@@ -27,13 +33,13 @@ fn random_uniform_agents(rng: &mut ThreadRng, n: usize, l: f64) -> Vec<state::Ag
 pub fn initialize_agents(
     rng: &mut ThreadRng,
     config: &AgentInitializationConfig,
-    l: f64,
+    l: Vector3<f64>,
 ) -> Vec<Agent> {
     match config {
-        RandomUniformByAreaNumberDensity(AgentAreaNumberDensityConfig {
-            area_number_density,
+        RandomUniformByVolumeNumberDensity(AgentVolumeNumberDensityConfig {
+            volume_number_density,
         }) => {
-            let n = (area_number_density * l.powi(2)).round() as usize;
+            let n = (volume_number_density * l.x * l.y * l.z).round() as usize;
             random_uniform_agents(rng, n, l)
         }
         RandomUniformByNumber(AgentNumberConfig { number }) => {

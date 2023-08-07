@@ -4,7 +4,6 @@ use bevy::{prelude::*, sprite::MaterialMesh2dBundle, time::common_conditions::on
 
 use nalgebra::{vector, zero, Point2, UnitVector2};
 use ricsek::{
-    dynamics::obstacle::{agent_obstacle_electro, agent_obstacle_hydro},
     math::{angle_to_x, linspace_grid},
     view::*,
 };
@@ -163,8 +162,7 @@ fn main() {
 
     let env = EnvironmentRes {
         l: config.parameters.sim_params.l,
-        window_size: 800.0,
-        arrow_length_pixels: 20.0,
+        arrow_length: 20.0e-6,
     };
 
     App::new()

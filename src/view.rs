@@ -1,6 +1,5 @@
 use crate::{
     config::setup::SetupConfig,
-    math::capsule::Capsule,
     state::{Agent, SimState},
 };
 use bevy::input::mouse::{MouseMotion, MouseWheel};
@@ -144,40 +143,22 @@ pub struct FlowVectorId;
 #[derive(Component)]
 pub struct AgentDirectionId(pub usize);
 
-#[derive(Resource)]
-pub struct Obstacles(pub Vec<Capsule>);
-
 #[derive(Component)]
 pub struct Movable;
 
 #[derive(Resource)]
 pub struct ViewState {
     pub i: usize,
-    pub rendered_i: Option<usize>,
 }
 impl ViewState {
     pub fn new() -> Self {
-        Self {
-            i: 0,
-            rendered_i: None,
-        }
-    }
-
-    pub fn is_stale(&self) -> bool {
-        match self.rendered_i {
-            Some(i) => self.i != i,
-            None => true,
-        }
-    }
-
-    pub fn mark_fresh(&mut self) {
-        self.rendered_i = Some(self.i);
+        Self { i: 0 }
     }
 }
 
 #[derive(Resource)]
 pub struct EnvironmentRes {
-    pub l: f64,
+    pub l: Vector3<f64>,
     pub arrow_length: f64,
 }
 
@@ -193,6 +174,10 @@ impl EnvironmentRes {
     pub fn transformed_vec3(&self, sd: Point3<f64>) -> Vec3 {
         let st = sd.map(|x| self.transform_coord(x));
         Vec3::new(st.x, st.y, st.z)
+    }
+
+    pub fn transformed_l(&self) -> Vec3 {
+        self.transformed_vec3(self.l.into())
     }
 
     pub fn inverted_vec3(&self, sd: Vec3) -> Point3<f64> {
@@ -219,8 +204,7 @@ pub fn nalgebra_to_glam_vec(v: &Vector3<f64>) -> Vec3 {
 }
 
 pub fn agent_transform(env: &EnvironmentRes, a: &Agent) -> Transform {
-    Transform::IDENTITY
-        .with_translation(env.transformed_vec3(a.r))
+    Transform::from_translation(env.transformed_vec3(a.r))
         .with_rotation(Quat::from_rotation_arc(Vec3::X, nalgebra_to_glam_vec(&a.u)))
 }
 
@@ -238,6 +222,11 @@ pub fn add_camera(mut commands: Commands) {
             ..Default::default()
         },
     ));
+
+    commands.insert_resource(AmbientLight {
+        color: Color::WHITE,
+        brightness: 0.1,
+    });
 }
 
 pub fn add_agents(
@@ -256,28 +245,27 @@ pub fn add_agents(
 
     let radius = config.parameters.sim_params.agent_radius;
 
-    cur_sim_state.agents.iter().enumerate().for_each(|(i, a)| {
-        let color = match i % 5 {
-            0 => Color::RED,
-            1 => Color::GREEN,
-            2 => Color::BLUE,
-            3 => Color::PURPLE,
-            4 => Color::CYAN,
-            _ => Color::WHITE,
-        };
+    let materials = [
+        materials.add(StandardMaterial::from(Color::RED)),
+        materials.add(StandardMaterial::from(Color::GREEN)),
+        materials.add(StandardMaterial::from(Color::BLUE)),
+        materials.add(StandardMaterial::from(Color::PURPLE)),
+        materials.add(StandardMaterial::from(Color::CYAN)),
+    ];
 
+    let agent_mesh = meshes.add(
+        shape::UVSphere {
+            radius: env.transform_coord(radius),
+            ..default()
+        }
+        .into(),
+    );
+
+    cur_sim_state.agents.iter().enumerate().for_each(|(i, a)| {
         commands.spawn((
             PbrBundle {
-                mesh: meshes
-                    .add(
-                        (shape::Circle {
-                            radius: env.transform_coord(radius),
-                            vertices: 10,
-                        })
-                        .into(),
-                    )
-                    .into(),
-                material: materials.add(StandardMaterial::from(color)),
+                mesh: agent_mesh.clone(),
+                material: materials[i % 5].clone(),
                 transform: agent_transform(&env, a),
                 ..default()
             },
@@ -346,4 +334,66 @@ pub fn increment_step(cur_i: usize, backward: bool, maxi: usize) -> usize {
     } else {
         (cur_i + 1).min(maxi)
     }
+}
+
+pub fn add_environment(
+  mut commands: Commands,
+  env: Res<EnvironmentRes>,
+  mut meshes: ResMut<Assets<Mesh>>,
+  mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+  let l = env.transformed_l();
+  // Need 6 rectangles, 2 for each boundary of the environment.
+  // For the boundary along x, the rectangle should have width l.y and height l.z
+  // And should be centred at (l.x / 2, 0, 0) and (-l.x / 2, 0, 0)
+  // And so on.
+  // The plane is on the XY plane, so we must do some rotations:
+  // - For the planes along the x-direction, it should sit on the YZ plane, so rotate by 90 degrees around Z.
+  let axis_configs = [
+      (
+          Vec2 {
+              x: l.z as f32,
+              y: l.y as f32,
+          },
+          Vec3::X,
+          l.x,
+          Vec3::Y,
+      ),
+      (
+          Vec2 {
+              x: l.z as f32,
+              y: l.x as f32,
+          },
+          Vec3::Y,
+          l.y,
+          Vec3::X,
+      ),
+      (
+          Vec2 {
+              x: l.y as f32,
+              y: l.x as f32,
+          },
+          Vec3::Z,
+          l.z,
+          Vec3::Y,
+      ),
+  ];
+
+  for (size, axis, axis_l, up) in axis_configs {
+      for sgn in [1, -1] {
+          commands.spawn((PbrBundle {
+              mesh: meshes.add(
+                  shape::Quad {
+                      size: size,
+                      flip: false,
+                  }
+                  .into(),
+              ),
+              material: materials.add(StandardMaterial::from(Color::WHITE)),
+              transform: Transform::from_translation(axis * (sgn as f32) * axis_l / 2.0 as f32)
+                  .looking_to(axis * sgn as f32, up),
+              ..default()
+          },));
+      }
+  }
 }
