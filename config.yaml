@@ -4,9 +4,9 @@ parameters:
   boundaries:
     - l: 100e-6
       closed: false
-    - l: 100e-6
+    - l: 20e-6
       closed: true
-    - l: 100e-6
+    - l: 20e-6
       closed: true
   object_stiffness: 1e15
   # fluid_temperature: 0.0
@@ -19,7 +19,13 @@ parameters:
   agent_agent_hydro_a: 0.0
   agent_agent_hydro_b: 0.0
 agent_initialization:
-  # type: RandomUniformByVolumeNumberDensity
-  # volume_number_density: 0.01e17
-  type: RandomUniformByNumber
-  number: 400
+  # - type: RandomUniformByNumber
+  #   number: 400
+  - type: Explicit
+    agents:
+      - r: [0.0, 0.0, 0.0]
+        u: [1.0, 0.0, 0.0]
+
+  # - type: RandomUniformByVolumeNumberDensity
+  #   volume_number_density: 0.01e17
+

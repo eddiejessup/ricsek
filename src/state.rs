@@ -6,6 +6,7 @@ pub struct SimState {
     pub step: usize,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct Agent {
     pub r: Point3<f64>,
     pub u: UnitVector3<f64>,

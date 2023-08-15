@@ -6,7 +6,7 @@ use rand::rngs::ThreadRng;
 
 use super::{
     AgentInitializationConfig, AgentInitializationConfig::*, AgentNumberConfig,
-    AgentVolumeNumberDensityConfig,
+    AgentVolumeNumberDensityConfig, ExplicitAgentConfig,
 };
 
 pub fn random_uniform_orientations(rng: &mut ThreadRng, n: usize) -> Vec<UnitVector3<f64>> {
@@ -32,7 +32,7 @@ fn random_uniform_agents(rng: &mut ThreadRng, n: usize, l: Vector3<f64>) -> Vec<
 
 pub fn initialize_agents(
     rng: &mut ThreadRng,
-    config: &AgentInitializationConfig,
+    config: AgentInitializationConfig,
     l: Vector3<f64>,
 ) -> Vec<Agent> {
     match config {
@@ -43,7 +43,8 @@ pub fn initialize_agents(
             random_uniform_agents(rng, n, l)
         }
         RandomUniformByNumber(AgentNumberConfig { number }) => {
-            random_uniform_agents(rng, *number, l)
+            random_uniform_agents(rng, number, l)
         }
+        Explicit(ExplicitAgentConfig { agents }) => agents,
     }
 }

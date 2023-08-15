@@ -3,6 +3,8 @@ pub mod parameters;
 
 use std::{error::Error, fs::File, io::Read, path::Path};
 
+use crate::state::Agent;
+
 use self::parameters::{physical::PhysicalParams, simulation::SimParams, Parameters};
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -15,7 +17,7 @@ enum ParametersYaml {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ConfigYaml {
     parameters: ParametersYaml,
-    agent_initialization: AgentInitializationConfig,
+    agent_initialization: Vec<AgentInitializationConfig>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -26,24 +28,30 @@ struct PointYaml {
 
 pub struct SetupConfig {
     pub parameters: Parameters,
-    pub agent_initialization: AgentInitializationConfig,
+    pub agent_initialization: Vec<AgentInitializationConfig>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum AgentInitializationConfig {
     RandomUniformByVolumeNumberDensity(AgentVolumeNumberDensityConfig),
     RandomUniformByNumber(AgentNumberConfig),
+    Explicit(ExplicitAgentConfig),
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct AgentVolumeNumberDensityConfig {
     pub volume_number_density: f64,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct AgentNumberConfig {
     pub number: usize,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct ExplicitAgentConfig {
+    pub agents: Vec<Agent>,
 }
 
 impl SetupConfig {

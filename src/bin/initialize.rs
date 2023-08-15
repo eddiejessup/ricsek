@@ -6,11 +6,11 @@ fn main() {
     let sim_params = &config.parameters.sim_params;
 
     let mut rng = rand::thread_rng();
-    let agents = config::setup::agents::initialize_agents(
+    let agents: Vec<Agent> = config.agent_initialization.iter().flat_map(|init_config| config::setup::agents::initialize_agents(
         &mut rng,
-        &config.agent_initialization,
+        init_config.clone(),
         sim_params.boundaries.l(),
-    );
+    )).collect();
     println!("Initialized {} agents", agents.len());
 
     let sim_state = SimState::new(agents);

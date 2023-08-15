@@ -82,7 +82,7 @@ fn main() {
         .insert_resource(SetupRes(setup))
         .insert_resource(ViewState::new())
         .add_systems(Startup, (add_camera_startup, add_agents))
-        .add_systems(Startup, add_environment)
+        .add_systems(Startup, environment::add_environment)
         .add_systems(Update, pan_orbit_camera_update)
         .add_systems(
             Update,

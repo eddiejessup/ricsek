@@ -8,7 +8,11 @@ use nalgebra::{Point3, Vector3};
 use ricsek::{
     config::setup::parameters::simulation::{AxisBoundaryConfig, BoundaryConfig},
     dynamics::stokes_solutions::*,
-    view::{*, pan_orbit_camera::{pan_orbit_camera_update, add_camera_startup}, environment::Environment},
+    view::{
+        environment::Environment,
+        pan_orbit_camera::{add_camera_startup, pan_orbit_camera_update},
+        *,
+    },
 };
 
 #[derive(Resource)]
@@ -370,7 +374,7 @@ fn main() {
         .insert_resource(Singularities(singularities))
         .insert_resource(ViewState::new())
         .add_systems(Startup, (add_samples, add_flow, add_camera_startup))
-        .add_systems(Startup, add_environment)
+        .add_systems(Startup, environment::add_environment)
         .add_systems(Update, pan_orbit_camera_update)
         .add_systems(
             Update,
