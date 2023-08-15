@@ -8,7 +8,7 @@ use nalgebra::{Point3, Vector3};
 use ricsek::{
     config::setup::parameters::simulation::{AxisBoundaryConfig, BoundaryConfig},
     dynamics::stokes_solutions::*,
-    view::*,
+    view::{*, pan_orbit_camera::{pan_orbit_camera_update, add_camera_startup}, environment::Environment},
 };
 
 #[derive(Resource)]
@@ -47,7 +47,7 @@ struct Singularities(Vec<Singularity>);
 fn add_samples(
     mut commands: Commands,
     samples: Res<Samples>,
-    env: Res<EnvironmentRes>,
+    env: Res<Environment>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -70,7 +70,7 @@ fn add_flow(
     mut commands: Commands,
     samples: Res<Samples>,
     singularities: Res<Singularities>,
-    env: Res<EnvironmentRes>,
+    env: Res<Environment>,
     view_state: Res<ViewState>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -142,7 +142,7 @@ fn add_flow(
 
 fn update_flow(
     samples: Res<Samples>,
-    env: Res<EnvironmentRes>,
+    env: Res<Environment>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut set: ParamSet<(
         Query<(&Transform, &SingularityParams)>,
@@ -216,7 +216,7 @@ fn update_flow(
             );
         }
 
-        match nalgebra_to_glam_vec(&v).try_normalize() {
+        match environment::nalgebra_to_glam_vec(&v).try_normalize() {
             Some(glam_u) => {
                 *transform = Transform::IDENTITY
                     .with_translation(env.transformed_vec3(r))
@@ -234,7 +234,7 @@ fn update_flow(
 
 fn change_view(
     keyboard_input: Res<Input<KeyCode>>,
-    env: Res<EnvironmentRes>,
+    env: Res<Environment>,
     mut view_state: ResMut<ViewState>,
     singularities: Res<Singularities>,
     mut q_singularity: Query<(&mut Transform, &mut SingularityParams)>,
@@ -307,7 +307,7 @@ impl ViewState {
 }
 
 fn main() {
-    let env = EnvironmentRes {
+    let env = environment::Environment {
         boundaries: BoundaryConfig(Vector3::new(
             AxisBoundaryConfig {
                 l: 200.0e-6,
@@ -323,6 +323,7 @@ fn main() {
             },
         )),
         arrow_length: 10.0e-6,
+        length_factor: 1e6,
     };
 
     let samples: Vec<Point3<f64>> = ricsek::math::grid(env.boundaries.l(), 1000);
@@ -338,14 +339,14 @@ fn main() {
             point: Point3::origin(),
             params: SingularityParams::Stresslet {
                 a: Vector3::new(1.0, 0.0, 0.0),
-                b: Vector3::new(1.0, 0.0, 0.0),
+                b: Vector3::new(-1.0, 0.0, 0.0),
             },
         },
         Singularity {
             point: Point3::origin(),
             params: SingularityParams::StokesDoublet {
                 a: Vector3::new(1.0, 0.0, 0.0),
-                b: Vector3::new(0.0, -1.0, 0.0),
+                b: Vector3::new(1.0, 0.0, 0.0),
             },
         },
         Singularity {
@@ -368,9 +369,9 @@ fn main() {
         .insert_resource(Samples(samples))
         .insert_resource(Singularities(singularities))
         .insert_resource(ViewState::new())
-        .add_systems(Startup, (add_samples, add_flow, add_camera))
+        .add_systems(Startup, (add_samples, add_flow, add_camera_startup))
         .add_systems(Startup, add_environment)
-        .add_systems(Update, pan_orbit_camera)
+        .add_systems(Update, pan_orbit_camera_update)
         .add_systems(
             Update,
             (

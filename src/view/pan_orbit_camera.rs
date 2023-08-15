@@ -1,11 +1,10 @@
+use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::prelude::*;
-use bevy::input::mouse::{MouseWheel,MouseMotion};
-use bevy::render::camera::Projection;
 
-// ANCHOR: example
-/// Tags an entity as capable of panning and orbiting.
+use super::environment::Environment;
+
 #[derive(Component)]
-struct PanOrbitCamera {
+pub struct PanOrbitCamera {
     /// The "focus point" to orbit around. It is automatically updated when panning the camera
     pub focus: Vec3,
     pub radius: f32,
@@ -22,8 +21,7 @@ impl Default for PanOrbitCamera {
     }
 }
 
-/// Pan the camera with middle mouse click, zoom with scroll wheel, orbit with right mouse click.
-fn pan_orbit_camera(
+pub fn pan_orbit_camera_update(
     mut ev_motion: EventReader<MouseMotion>,
     mut ev_scroll: EventReader<MouseWheel>,
     input_mouse: Res<Input<MouseButton>>,
@@ -65,8 +63,8 @@ fn pan_orbit_camera(
         }
 
         let Ok(window) = window_query.get_single() else {
-          return;
-        };
+            return;
+          };
 
         let mut any = false;
         if rotation_move.length_squared() > 0.0 {
@@ -74,7 +72,11 @@ fn pan_orbit_camera(
             let window = get_window_size(window);
             let delta_x = {
                 let delta = rotation_move.x / window.x * std::f32::consts::PI * 2.0;
-                if pan_orbit.upside_down { -delta } else { delta }
+                if pan_orbit.upside_down {
+                    -delta
+                } else {
+                    delta
+                }
             };
             let delta_y = rotation_move.y / window.y * std::f32::consts::PI;
             let yaw = Quat::from_rotation_y(-delta_x);
@@ -96,7 +98,7 @@ fn pan_orbit_camera(
             pan_orbit.focus += translation;
         } else if scroll.abs() > 0.0 {
             any = true;
-            pan_orbit.radius -= scroll * pan_orbit.radius * 0.2;
+            pan_orbit.radius -= scroll * pan_orbit.radius * 0.01;
             // dont allow zoom to reach zero or you get stuck
             pan_orbit.radius = f32::max(pan_orbit.radius, 0.05);
         }
@@ -106,7 +108,8 @@ fn pan_orbit_camera(
             // parent = x and y rotation
             // child = z-offset
             let rot_matrix = Mat3::from_quat(transform.rotation);
-            transform.translation = pan_orbit.focus + rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, pan_orbit.radius));
+            transform.translation =
+                pan_orbit.focus + rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, pan_orbit.radius));
         }
     }
 
@@ -119,47 +122,23 @@ fn get_window_size(window: &Window) -> Vec2 {
     Vec2::new(window.width() as f32, window.height() as f32)
 }
 
-fn spawn_camera(mut commands: Commands) {
-    let translation = Vec3::new(-2.0, 2.5, 5.0);
+pub fn add_camera_startup(mut commands: Commands, env: Res<Environment>) {
+    let translation = Vec3::new(0.0, 0.0, env.transformed_l().max_element());
     let radius = translation.length();
 
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_translation(translation)
-                .looking_at(Vec3::ZERO, Vec3::Y),
-            ..Default::default()
+            transform: Transform::from_translation(translation).looking_at(Vec3::ZERO, Vec3::Y),
+            ..default()
         },
         PanOrbitCamera {
             radius,
             ..Default::default()
         },
     ));
-}
 
-fn spawn_scene(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    // spawn a cube and a light
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-        material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-        transform: Transform::from_translation(Vec3::new(0.0, 0.5, 0.0)),
-        ..Default::default()
+    commands.insert_resource(AmbientLight {
+        color: Color::WHITE,
+        brightness: 0.1,
     });
-    commands.spawn(PointLightBundle {
-        transform: Transform::from_translation(Vec3::new(4.0, 8.0, 4.0)),
-        ..Default::default()
-    });
-
-    spawn_camera(commands);
-}
-
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_systems(Startup, spawn_scene)
-        .add_systems(Update, pan_orbit_camera)
-        .run();
 }

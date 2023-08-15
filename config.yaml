@@ -2,15 +2,15 @@ parameters:
   type: Physical
   dt: 0.001
   boundaries:
-    - l: 20e-6
+    - l: 100e-6
       closed: false
-    - l: 20e-6
+    - l: 100e-6
       closed: true
-    - l: 20e-6
+    - l: 100e-6
       closed: true
   object_stiffness: 1e15
-  fluid_temperature: 0.0
-  # fluid_temperature: 300.0
+  # fluid_temperature: 0.0
+  fluid_temperature: 300.0
   fluid_viscosity: 0.001
   agent_radius: 2e-6
   agent_aspect_ratio: 2.0
@@ -22,4 +22,4 @@ agent_initialization:
   # type: RandomUniformByVolumeNumberDensity
   # volume_number_density: 0.01e17
   type: RandomUniformByNumber
-  number: 10
+  number: 400
