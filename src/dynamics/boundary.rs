@@ -1,45 +1,28 @@
 use nalgebra::{Point3, UnitVector3, Vector3};
 
-use crate::config::setup::parameters::simulation::BoundaryConfig;
+use crate::config::setup::parameters::common::BoundaryConfig;
 
 use super::electro::electro_kinematics;
 
 fn wrap1(x: f64, l: f64) -> f64 {
-    if x < -l * 0.5 {
-        // let n_wrap = (x / (l * 0.5)).abs().ceil();
-        // if n_wrap > 1.0 {
-        //   panic!("n_wrap = {} > 1", n_wrap);
-        // }
-        x + l
-    } else if x > l * 0.5 {
-        x - l
-    } else {
-        x
+    match (x / (l * 0.5)) as i64 {
+      0 => x,
+      1 => x - l,
+      -1 => x + l,
+      n => panic!("Unexpected n_wrap: {}", n)
     }
 }
 
 pub fn wrap(r: Point3<f64>, boundaries: &BoundaryConfig) -> Point3<f64> {
-  Point3::new(
-    if boundaries.0.x.closed {
-      r.x
-    } else {
-      wrap1(r.x, boundaries.0.x.l)
-    },
-    if boundaries.0.y.closed {
-      r.y
-    } else {
-      wrap1(r.y, boundaries.0.y.l)
-    },
-    if boundaries.0.z.closed {
-      r.z
-    } else {
-      wrap1(r.z, boundaries.0.z.l)
-    },
-  )
+    Point3::new(
+      wrap1(r.x, boundaries.0.x.l),
+      wrap1(r.y, boundaries.0.y.l),
+      wrap1(r.z, boundaries.0.z.l),
+    )
 }
 
 pub fn wrap_vec(r: Vector3<f64>, boundaries: &BoundaryConfig) -> Vector3<f64> {
-  wrap(r.into(), boundaries).coords
+    wrap(r.into(), boundaries).coords
 }
 
 pub fn agent_boundary_electro(

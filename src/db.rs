@@ -34,7 +34,12 @@ pub fn initialize_run(conn: &mut PgConnection, config: &SetupConfig) -> usize {
     run_id as usize
 }
 
-pub fn write_checkpoint(conn: &mut PgConnection, rid: usize, sim_state: &SimState) -> i32 {
+pub fn write_checkpoint(
+    conn: &mut PgConnection,
+    rid: usize,
+    sim_state: &SimState,
+    summary: Option<Vec<AgentStepSummary>>,
+) -> i32 {
     use crate::db::schema::env::dsl::*;
     use diesel::dsl::Eq;
     let eid: i32 = diesel::insert_into(env)
@@ -63,6 +68,9 @@ pub fn write_checkpoint(conn: &mut PgConnection, rid: usize, sim_state: &SimStat
                 ux.eq(a.u.x),
                 uy.eq(a.u.y),
                 uz.eq(a.u.z),
+                step_summary.eq(summary
+                    .as_ref()
+                    .map(|ss| serde_json::to_value(&ss[aid]).unwrap())),
             )
         })
         .collect();
@@ -117,10 +125,16 @@ pub fn env_to_sim_state(conn: &mut PgConnection, env: &models::Env) -> SimState 
         })
         .collect();
 
+    let summary: Option<Vec<AgentStepSummary>> = agent_vals
+        .iter()
+        .map(|a| a.step_summary.as_ref().and_then(|ss| serde_json::from_value(ss.clone()).ok()))
+        .collect();
+
     SimState {
         step: env.step as usize,
         t: env.t,
         agents,
+        summary,
     }
 }
 

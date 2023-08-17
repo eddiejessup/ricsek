@@ -1,13 +1,32 @@
 use crate::math::point::{random_unit_vector, random_vector};
 use crate::state::{self, *};
+
 use nalgebra::{Point3, UnitVector3, Vector3};
 use rand::distributions::Uniform;
 use rand::rngs::ThreadRng;
 
-use super::{
-    AgentInitializationConfig, AgentInitializationConfig::*, AgentNumberConfig,
-    AgentVolumeNumberDensityConfig, ExplicitAgentConfig,
-};
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum AgentInitializationConfig {
+    RandomUniformByVolumeNumberDensity(AgentVolumeNumberDensityConfig),
+    RandomUniformByNumber(AgentNumberConfig),
+    Explicit(ExplicitAgentConfig),
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct AgentVolumeNumberDensityConfig {
+    pub volume_number_density: f64,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct AgentNumberConfig {
+    pub number: usize,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct ExplicitAgentConfig {
+    pub agents: Vec<Agent>,
+}
 
 pub fn random_uniform_orientations(rng: &mut ThreadRng, n: usize) -> Vec<UnitVector3<f64>> {
     (0..n).map(|_i| random_unit_vector(rng)).collect()
@@ -36,15 +55,17 @@ pub fn initialize_agents(
     l: Vector3<f64>,
 ) -> Vec<Agent> {
     match config {
-        RandomUniformByVolumeNumberDensity(AgentVolumeNumberDensityConfig {
-            volume_number_density,
-        }) => {
+        AgentInitializationConfig::RandomUniformByVolumeNumberDensity(
+            AgentVolumeNumberDensityConfig {
+                volume_number_density,
+            },
+        ) => {
             let n = (volume_number_density * l.x * l.y * l.z).round() as usize;
             random_uniform_agents(rng, n, l)
         }
-        RandomUniformByNumber(AgentNumberConfig { number }) => {
+        AgentInitializationConfig::RandomUniformByNumber(AgentNumberConfig { number }) => {
             random_uniform_agents(rng, number, l)
         }
-        Explicit(ExplicitAgentConfig { agents }) => agents,
+        AgentInitializationConfig::Explicit(ExplicitAgentConfig { agents }) => agents,
     }
 }

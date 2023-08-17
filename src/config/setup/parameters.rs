@@ -2,9 +2,12 @@ use self::{simulation::SimParams, physical::PhysicalParams};
 
 pub mod physical;
 pub mod simulation;
+pub mod common;
+pub mod singularities;
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub struct Parameters {
-    pub sim_params: SimParams,
-    pub physical_params: Option<PhysicalParams>,
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type")]
+pub enum ParametersYaml {
+    Physical(PhysicalParams),
+    Simulation(SimParams),
 }

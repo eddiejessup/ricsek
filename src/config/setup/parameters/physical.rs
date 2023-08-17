@@ -1,23 +1,24 @@
 use std::f64::consts::PI;
 
-use super::simulation::{BoundaryConfig, SimParams};
+use super::{simulation::SimParams, common::BoundaryConfig};
 
 // Derive JSON deserialize for PhysicalParams.
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct PhysicalParams {
     // Time step.
     pub dt: f64,
-    // System size.
+    // System.
     pub boundaries: BoundaryConfig,
+    pub singularities: Vec<super::singularities::Singularity>,
+    // Agent shape.
+    pub agent_radius: f64,
+    pub agent_aspect_ratio: f64,
     // Stiffness of both agents and surfaces.
     // (Used to compute the strength of agent-{agent, surface} electrostatics)
     pub object_stiffness: f64,
     // Fluid.
     pub fluid_temperature: f64,
     pub fluid_viscosity: f64,
-    // Agent shape.
-    pub agent_radius: f64,
-    pub agent_aspect_ratio: f64,
     // Agent propulsion.
     // TODO: Derive all the below from more fundamental parameters.
     // Force the agent applies to the fluid through its propulsion.
@@ -96,6 +97,7 @@ impl PhysicalParams {
         SimParams {
             dt: self.dt,
             boundaries: self.boundaries.clone(),
+            singularities: self.singularities.clone(),
             agent_radius: self.agent_radius,
             agent_aspect_ratio: self.agent_aspect_ratio,
             agent_propulsion_speed: self

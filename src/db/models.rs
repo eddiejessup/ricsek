@@ -20,6 +20,7 @@ pub struct Agent {
     pub ux: f64,
     pub uy: f64,
     pub uz: f64,
+    pub step_summary: Option<serde_json::Value>,
 }
 
 #[derive(Queryable)]

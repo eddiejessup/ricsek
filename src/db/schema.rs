@@ -10,6 +10,7 @@ diesel::table! {
         ux -> Float8,
         uy -> Float8,
         uz -> Float8,
+        step_summary -> Nullable<Jsonb>,
     }
 }
 

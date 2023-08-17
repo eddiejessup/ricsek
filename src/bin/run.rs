@@ -33,7 +33,7 @@ fn main() {
 
     let run_config = RunConfig {
         t_max: args.t_max,
-        dstep_view: setup.parameters.sim_params.to_steps(args.dt_view),
+        dstep_view: setup.parameters.to_steps(args.dt_view),
         run_id,
     };
 
@@ -42,7 +42,7 @@ fn main() {
 
     run(
         conn,
-        setup.parameters.sim_params,
+        setup.parameters,
         sim_state,
         run_config,
     );
