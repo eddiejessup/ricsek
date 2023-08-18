@@ -80,6 +80,7 @@ pub fn add_flow(
                         mesh: cone.clone(),
                         material: child_material.clone(),
                         transform: transform_mesh.with_translation(-Vec3::Z * cylinder_height),
+                        // transform: transform_mesh,
                         ..default()
                     },
                     FlowVectorMesh,
@@ -170,33 +171,33 @@ pub fn update_flow(
                 Visibility::Visible
             };
 
-            // Set the orientation of the overall flow-vector.
-            match nalgebra_to_glam_vec(&v).try_normalize() {
-                Some(glam_u) => {
-                    *transform =
-                        Transform::from_scale(Vec3::splat(env.transform_coord(env.arrow_length)))
-                            .looking_to(glam_u, Vec3::Z)
-                }
-                None => {
-                    *visibility = Visibility::Hidden;
-                }
-            };
-
-            // Set the color of each part of the flow vector.
-            for &flow_parent_child in flow_parent_children.iter() {
-                let color_handle = q_vec_flow_children.get(flow_parent_child).unwrap();
-                let color_mat = materials.get_mut(color_handle).unwrap();
-                color_mat.base_color = Color::rgba(
-                    mag_color.r as f32,
-                    mag_color.g as f32,
-                    mag_color.b as f32,
-                    mag_color.a as f32,
-                );
+        // Set the orientation of the overall flow-vector.
+        match nalgebra_to_glam_vec(&v).try_normalize() {
+            Some(glam_u) => {
+                *transform =
+                    Transform::from_scale(Vec3::splat(env.transform_coord(env.arrow_length)))
+                        .looking_to(glam_u, Vec3::Z)
             }
+            None => {
+                *visibility = Visibility::Hidden;
+            }
+        };
+
+        // Set the color of each part of the flow vector.
+        for &flow_parent_child in flow_parent_children.iter() {
+            let color_handle = q_vec_flow_children.get(flow_parent_child).unwrap();
+            let color_mat = materials.get_mut(color_handle).unwrap();
+            color_mat.base_color = Color::rgba(
+                mag_color.r as f32,
+                mag_color.g as f32,
+                mag_color.b as f32,
+                mag_color.a as f32,
+            );
         }
     }
     println!("");
     println!("");
+    }
 }
 
 pub fn change_view(keyboard_input: Res<Input<KeyCode>>, mut view_state: ResMut<FlowViewState>) {

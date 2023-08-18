@@ -70,34 +70,39 @@ pub fn add_agents(
                 AgentId(i),
                 flow::VectorSet(vec![]),
             ))
-            .with_children(|parent| {
-                parent.spawn(PbrBundle {
-                    mesh: agent_mesh.clone(),
-                    material: material.clone(),
-                    transform: transform_mesh,
-                    ..default()
-                });
-                parent.spawn(PbrBundle {
-                    mesh: cone.clone(),
-                    material: material.clone(),
-                    transform: transform_mesh.with_translation(-Vec3::Z * cylinder_height),
-                    ..default()
-                });
-                parent.spawn(PbrBundle {
-                    mesh: cylinder.clone(),
-                    material: material.clone(),
-                    transform: transform_mesh.with_translation(-Vec3::Z * cylinder_height / 2.0),
-                    ..default()
-                });
+            .with_children(|point_parent| {
+                point_parent
+                    .spawn((SpatialBundle::default(), AgentId(i)))
+                    .with_children(|agent_parent| {
+                        agent_parent.spawn(PbrBundle {
+                            mesh: agent_mesh.clone(),
+                            material: material.clone(),
+                            transform: transform_mesh,
+                            ..default()
+                        });
+                        agent_parent.spawn(PbrBundle {
+                            mesh: cone.clone(),
+                            material: material.clone(),
+                            transform: transform_mesh.with_translation(-Vec3::Z * cylinder_height),
+                            ..default()
+                        });
+                        agent_parent.spawn(PbrBundle {
+                            mesh: cylinder.clone(),
+                            material: material.clone(),
+                            transform: transform_mesh
+                                .with_translation(-Vec3::Z * cylinder_height / 2.0),
+                            ..default()
+                        });
+                    });
             });
     });
 }
 
-fn update_agents(
+fn update_agent_points(
     sim_states: Res<SimStates>,
     env: Res<Environment>,
     view_state: Res<ViewState>,
-    mut query_ag: Query<(&AgentId, &mut Transform, &mut flow::VectorSet)>,
+    mut q_point: Query<(&AgentId, &mut flow::VectorSet, &mut Transform)>,
 ) {
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
@@ -108,10 +113,9 @@ fn update_agents(
     };
 
     println!("Updating positions for agents, to view_i: {}", view_i);
-    for (agent_id, mut transform, mut vector_set) in &mut query_ag {
+    for (agent_id, mut vector_set, mut transform) in &mut q_point {
         let agent = &cur_sim_state.agents[agent_id.0];
-        *transform = Transform::from_translation(env.transformed_vec3(agent.r))
-            .looking_to(nalgebra_to_glam_vec(&agent.u), Vec3::Z);
+        *transform = Transform::from_translation(env.transformed_vec3(agent.r));
 
         if let Some(agent_summaries) = opt_summary {
             let agent_summary = &agent_summaries[agent_id.0];
@@ -126,6 +130,20 @@ fn update_agents(
                 ("singularity".to_string(), agent_summary.v_singularity),
             ])
         }
+    }
+}
+
+fn update_agent_orientations(
+    sim_states: Res<SimStates>,
+    view_state: Res<ViewState>,
+    mut q_ag: Query<(&AgentId, &mut Transform)>,
+) {
+    let view_i = view_state.i;
+    let cur_sim_state = &sim_states.0[view_i];
+    println!("Updating orientations for agents, to view_i: {}", view_i);
+    for (agent_id, mut transform) in &mut q_ag {
+        let agent = &cur_sim_state.agents[agent_id.0];
+        *transform = Transform::IDENTITY.looking_to(nalgebra_to_glam_vec(&agent.u), Vec3::Z);
     }
 }
 
@@ -198,7 +216,7 @@ fn main() {
 
     let env = Environment {
         boundaries: setup.parameters.boundaries.clone(),
-        arrow_length: 7.0e-6,
+        arrow_length: 3.0e-6,
         length_factor: 1e6,
     };
 
@@ -218,15 +236,16 @@ fn main() {
         .add_systems(
             Update,
             (
-                flow::update_flow,
-                flow::change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
+                update_agent_points,
+                update_agent_orientations,
+                change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
             ),
         )
         .add_systems(
-            Update,
+            PostUpdate,
             (
-                update_agents,
-                change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
+                flow::update_flow,
+                flow::change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
             ),
         )
         .add_systems(Update, bevy::window::close_on_esc)
