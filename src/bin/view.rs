@@ -45,7 +45,7 @@ pub fn add_agents(
         bevy_more_shapes::Cone {
             radius: 1.0,
             height: 1.0,
-            segments: 32,
+            segments: 16,
         }
         .into(),
     );
@@ -54,7 +54,7 @@ pub fn add_agents(
         shape::Cylinder {
             radius: 0.3,
             height: cylinder_height,
-            resolution: 32,
+            resolution: 16,
             ..default()
         }
         .into(),

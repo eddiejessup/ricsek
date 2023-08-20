@@ -16,7 +16,7 @@ use ricsek::{
 
 pub struct Marker {
     pub r: Point3<f64>,
-    pub vs: Vec<Vector3<f64>>,
+    pub vs: flow::VectorSet,
 }
 
 #[derive(Resource)]
@@ -42,7 +42,7 @@ pub fn add_flow_markers(
                 transform: Transform::from_translation(env.transformed_vec3(sample.r)),
                 ..default()
             },
-            flow::VectorSet(sample.vs.clone()),
+            sample.vs.clone(),
         ));
     }
 }
@@ -59,56 +59,76 @@ fn main() {
                 closed: true,
             },
             AxisBoundaryConfig {
-                l: 20.0e-6,
+                l: 100.0e-6,
                 closed: true,
             },
         )),
-        arrow_length: 10.0e-6,
+        arrow_length: 3.0e-6,
         length_factor: 1e6,
     };
 
     let sample_rs: Vec<Point3<f64>> = ricsek::math::grid(env.boundaries.l(), 1000);
 
-    let singularities = vec![
-        Singularity {
-            point: Point3::origin(),
-            params: SingularityParams::Stokeslet {
-                a: Vector3::new(1.0, 1.0, 1.0),
+    let singularities: Vec<(String, Singularity)> = vec![
+        (
+            String::from("Stokeslet"),
+            Singularity {
+                point: Point3::origin(),
+                params: SingularityParams::Stokeslet {
+                    a: Vector3::new(1.0, 1.0, 0.0),
+                },
             },
-        },
-        Singularity {
-            point: Point3::origin(),
-            params: SingularityParams::Stresslet {
-                a: Vector3::new(1.0, 0.0, 0.0),
-                b: Vector3::new(-1.0, 0.0, 0.0),
+        ),
+        (
+            String::from("Stresslet"),
+            Singularity {
+                point: Point3::origin(),
+                params: SingularityParams::Stresslet {
+                    a: Vector3::new(1.0, 0.0, 0.0),
+                    b: Vector3::new(0.0, 0.0, -1.0),
+                },
             },
-        },
-        Singularity {
-            point: Point3::origin(),
-            params: SingularityParams::StokesDoublet {
-                a: Vector3::new(1.0, 0.0, 0.0),
-                b: Vector3::new(1.0, 0.0, 0.0),
+        ),
+        (
+            String::from("StokesDoublet"),
+            Singularity {
+                point: Point3::origin(),
+                params: SingularityParams::StokesDoublet {
+                    a: Vector3::new(1.0, 0.0, 0.0),
+                    b: Vector3::new(0.0, 0.0, -1.0),
+                },
             },
-        },
-        Singularity {
-            point: Point3::origin(),
-            params: SingularityParams::Rotlet {
-                c: Vector3::new(0.0, 1.0, 0.0),
+        ),
+        (
+            String::from("Rotlet"),
+            Singularity {
+                point: Point3::origin(),
+                params: SingularityParams::Rotlet {
+                    c: Vector3::new(0.0, 1.0, 0.0),
+                },
             },
-        },
-        Singularity {
-            point: Point3::origin(),
-            params: SingularityParams::PotentialDoublet {
-                d: Vector3::new(0.0, 1.0, 0.0),
+        ),
+        (
+            String::from("PotentialDoublet"),
+            Singularity {
+                point: Point3::origin(),
+                params: SingularityParams::PotentialDoublet {
+                    d: Vector3::new(0.0, 1.0, 0.0),
+                },
             },
-        },
+        ),
     ];
 
     let markers: Vec<Marker> = sample_rs
         .iter()
         .map(|r| Marker {
             r: *r,
-            vs: singularities.iter().map(|s| s.eval(*r)).collect(),
+            vs: flow::VectorSet(
+                singularities
+                    .iter()
+                    .map(|(label, s)| (label.clone(), s.eval(*r)))
+                    .collect(),
+            ),
         })
         .collect();
     let n_samples = markers.len();

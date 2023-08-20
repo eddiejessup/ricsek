@@ -29,10 +29,7 @@ pub fn update(
 
     let mut agent_summaries: Vec<AgentStepSummary> = vec![];
     for (i, agent) in sim_state.agents.iter_mut().enumerate() {
-        let r1c_r2cs = agent_rs
-            .iter()
-            .map(|r2| boundary::wrap_vec(r2 - agent.r, &sim_params.boundaries))
-            .collect::<Vec<_>>();
+        let r1c_r2cs = boundary::pairwise_dist(agent.r, &agent_rs, &sim_params.boundaries);
 
         // Fluid velocity and rotation.
 
@@ -70,7 +67,8 @@ pub fn update(
             .map(|singularity| singularity.eval(agent.r))
             .sum::<Vector3<f64>>();
 
-        let v_net = v_agent_electro + v_agent_hydro + v_propulsion + v_boundary_electro + v_singularity;
+        let v_net =
+            v_agent_electro + v_agent_hydro + v_propulsion + v_boundary_electro + v_singularity;
 
         // Update agent position from velocity.
         agent.r += v_net * sim_params.dt;
@@ -78,7 +76,7 @@ pub fn update(
         agent.r += random_vector(rng, trans_diff_distr);
 
         // Apply periodic boundary condition.
-        agent.r = boundary::wrap(agent.r, &sim_params.boundaries);
+        boundary::wrap_inplace(&mut agent.r, &sim_params.boundaries);
 
         // Compute rotational diffusion rotation.
         let rot = brownian::random_rotation(rng, &uniform_theta, &uniform_cos_phi, &rot_diff_distr);
@@ -86,11 +84,11 @@ pub fn update(
         agent.u = rot * agent.u;
 
         agent_summaries.push(AgentStepSummary {
-          v_agent_electro,
-          v_agent_hydro,
-          v_propulsion,
-          v_boundary_electro,
-          v_singularity,
+            v_agent_electro,
+            v_agent_hydro,
+            v_propulsion,
+            v_boundary_electro,
+            v_singularity,
         });
     }
 

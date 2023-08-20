@@ -1,28 +1,62 @@
 use nalgebra::{Point3, UnitVector3, Vector3};
 
-use crate::config::setup::parameters::common::BoundaryConfig;
+use crate::config::setup::parameters::common::{AxisBoundaryConfig, BoundaryConfig};
 
 use super::electro::electro_kinematics;
 
 fn wrap1(x: f64, l: f64) -> f64 {
     match (x / (l * 0.5)) as i64 {
-      0 => x,
-      1 => x - l,
-      -1 => x + l,
-      n => panic!("Unexpected n_wrap: {}", n)
+        0 => x,
+        1 => x - l,
+        -1 => x + l,
+        n => panic!("Unexpected n_wrap: {}", n),
     }
+}
+
+fn wrap1c(x: f64, boundary: &AxisBoundaryConfig) -> f64 {
+    if boundary.closed {
+        x
+    } else {
+        wrap1(x, boundary.l)
+    }
+}
+
+pub fn wrap_inplace(r: &mut Point3<f64>, boundaries: &BoundaryConfig) {
+    r.x = wrap1c(r.x, &boundaries.0.x);
+    r.y = wrap1c(r.y, &boundaries.0.y);
+    r.z = wrap1c(r.z, &boundaries.0.z);
+}
+
+pub fn wrap_vec_inplace(r: &mut Vector3<f64>, boundaries: &BoundaryConfig) {
+    r.x = wrap1c(r.x, &boundaries.0.x);
+    r.y = wrap1c(r.y, &boundaries.0.y);
+    r.z = wrap1c(r.z, &boundaries.0.z);
 }
 
 pub fn wrap(r: Point3<f64>, boundaries: &BoundaryConfig) -> Point3<f64> {
     Point3::new(
-      wrap1(r.x, boundaries.0.x.l),
-      wrap1(r.y, boundaries.0.y.l),
-      wrap1(r.z, boundaries.0.z.l),
+        wrap1c(r.x, &boundaries.0.x),
+        wrap1c(r.y, &boundaries.0.y),
+        wrap1c(r.z, &boundaries.0.z),
     )
 }
 
 pub fn wrap_vec(r: Vector3<f64>, boundaries: &BoundaryConfig) -> Vector3<f64> {
     wrap(r.into(), boundaries).coords
+}
+
+pub fn pairwise_dist(
+    r: Point3<f64>,
+    rs: &Vec<Point3<f64>>,
+    boundaries: &BoundaryConfig,
+) -> Vec<Vector3<f64>> {
+    rs.iter()
+        .map(|r2| {
+            let mut dr = r2 - r;
+            wrap_vec_inplace(&mut dr, boundaries);
+            dr
+        })
+        .collect()
 }
 
 pub fn agent_boundary_electro(

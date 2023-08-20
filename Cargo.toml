@@ -44,3 +44,6 @@ name = "view"
 
 [[bin]]
 name = "view_stokes_solutions"
+
+[profile.release]
+debug = 1
