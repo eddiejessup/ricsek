@@ -69,18 +69,24 @@ fn main() {
 
     let sample_rs: Vec<Point3<f64>> = ricsek::math::grid(env.boundaries.l(), 1000);
 
+    let stokeslet_origin = Singularity {
+        point: Point3::origin(),
+        params: SingularityParams::Stokeslet {
+            a: Vector3::new(1.0, 0.0, 0.0),
+        },
+    };
+    let stokeslet_mirror = Singularity {
+        point: stokeslet_origin.point + Vector3::new(0.0, 0.0, 2.0 * env.boundaries.0.z.l),
+        params: SingularityParams::Stokeslet {
+            a: Vector3::new(-1.0, 0.0, 0.0),
+        },
+    };
+
     let singularities: Vec<(String, Singularity)> = vec![
+        (String::from("Stokeslet, Origin"), stokeslet_origin),
+        (String::from("Stokeslet, Mirror"), stokeslet_mirror),
         (
-            String::from("Stokeslet"),
-            Singularity {
-                point: Point3::origin(),
-                params: SingularityParams::Stokeslet {
-                    a: Vector3::new(1.0, 1.0, 0.0),
-                },
-            },
-        ),
-        (
-            String::from("Stresslet"),
+            String::from("Stresslet, Origin"),
             Singularity {
                 point: Point3::origin(),
                 params: SingularityParams::Stresslet {
@@ -90,7 +96,7 @@ fn main() {
             },
         ),
         (
-            String::from("StokesDoublet"),
+            String::from("StokesDoublet, Origin"),
             Singularity {
                 point: Point3::origin(),
                 params: SingularityParams::StokesDoublet {
@@ -100,7 +106,7 @@ fn main() {
             },
         ),
         (
-            String::from("Rotlet"),
+            String::from("Rotlet, Origin"),
             Singularity {
                 point: Point3::origin(),
                 params: SingularityParams::Rotlet {
@@ -109,7 +115,7 @@ fn main() {
             },
         ),
         (
-            String::from("PotentialDoublet"),
+            String::from("PotentialDoublet, Origin"),
             Singularity {
                 point: Point3::origin(),
                 params: SingularityParams::PotentialDoublet {
