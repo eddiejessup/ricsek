@@ -1,4 +1,5 @@
 use bevy::input::mouse::{MouseMotion, MouseWheel};
+use bevy::pbr::wireframe::WireframeConfig;
 use bevy::prelude::*;
 
 use super::environment::Environment;
@@ -122,7 +123,13 @@ fn get_window_size(window: &Window) -> Vec2 {
     Vec2::new(window.width() as f32, window.height() as f32)
 }
 
-pub fn add_camera_startup(mut commands: Commands, env: Res<Environment>) {
+pub fn add_camera(
+    mut commands: Commands,
+    env: Res<Environment>,
+    // mut wireframe_config: ResMut<WireframeConfig>,
+) {
+    // wireframe_config.global = false;
+
     let translation = Vec3::new(0.0, 0.0, env.transformed_l().max_element());
     let radius = translation.length();
 

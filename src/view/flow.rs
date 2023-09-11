@@ -1,17 +1,15 @@
-use std::f32::consts::FRAC_PI_2;
-
-use bevy::{pbr::PbrBundle, prelude::*, render::view::visibility::Visibility};
+use bevy::{prelude::*, render::view::visibility::Visibility};
 use nalgebra::Vector3;
 
 use crate::view::common::nalgebra_to_glam_vec;
 
-use super::environment::Environment;
+use super::{environment::Environment, common::spawn_arrow};
 
 #[derive(Component, Clone)]
-pub struct VectorSet(pub Vec<(String, Vector3<f64>)>);
+pub struct VectorLabel(pub String);
 
-#[derive(Component)]
-pub struct FlowVectorMesh;
+#[derive(Component, Clone)]
+pub struct VectorSet(pub Vec<(VectorLabel, Vector3<f64>)>);
 
 #[derive(Component)]
 pub struct FlowVector;
@@ -48,56 +46,16 @@ pub fn add_flow(
         },
     ));
 
-    // Marker flow vectors.
-    let cone: Handle<Mesh> = meshes.add(
-        bevy_more_shapes::Cone {
-            radius: 1.0,
-            height: 1.0,
-            segments: 16,
-        }
-        .into(),
-    );
-    let cylinder_height = 3.0;
-    let cylinder: Handle<Mesh> = meshes.add(
-        shape::Cylinder {
-            radius: 0.3,
-            height: cylinder_height,
-            resolution: 16,
-            ..default()
-        }
-        .into(),
-    );
-    let transform_mesh = Transform::from_rotation(Quat::from_rotation_x(-FRAC_PI_2));
-
     for vset_entity in q_vsets.iter() {
         // Create a new material here, because we will in fact change the color
         // of the flow vector.
         let child_material: Handle<StandardMaterial> =
-            materials.add(StandardMaterial::from(Color::PURPLE));
+            materials.add(StandardMaterial::from(Color::PURPLE.with_a(0.9)));
 
         let flow_vector_parent = commands
             .spawn((FlowVector, SpatialBundle { ..default() }))
             .with_children(|parent| {
-                parent.spawn((
-                    PbrBundle {
-                        mesh: cone.clone(),
-                        material: child_material.clone(),
-                        transform: transform_mesh.with_translation(-Vec3::Z * cylinder_height),
-                        // transform: transform_mesh,
-                        ..default()
-                    },
-                    FlowVectorMesh,
-                ));
-                parent.spawn((
-                    PbrBundle {
-                        mesh: cylinder.clone(),
-                        material: child_material.clone(),
-                        transform: transform_mesh
-                            .with_translation(-Vec3::Z * cylinder_height / 2.0),
-                        ..default()
-                    },
-                    FlowVectorMesh,
-                ));
+                spawn_arrow(parent, &mut meshes, child_material);
             })
             .id();
 
@@ -108,17 +66,15 @@ pub fn add_flow(
 pub fn update_flow(
     env: Res<Environment>,
     flow_view_state: Res<FlowViewState>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     q_vectorset: Query<(&VectorSet, &Children)>,
-    mut q_flow_vectors: Query<(&mut Transform, &mut Visibility, &Children), With<FlowVector>>,
-    q_vec_flow_children: Query<&Handle<StandardMaterial>, With<FlowVectorMesh>>,
+    mut q_flow_vectors: Query<(&mut Transform, &mut Visibility), With<FlowVector>>,
     mut q_text: Query<&mut Text>,
 ) {
-    let net_vs: Vec<(Vec<String>, Vector3<f64>)> = q_vectorset
+    let net_vs: Vec<(Vec<VectorLabel>, Vector3<f64>)> = q_vectorset
         .iter()
         .map(|(vset, _children)| {
             // Keep the set of vectors that are enabled according to flow_view_state.
-            let vset_enabled: Vec<(String, Vector3<f64>)> = vset
+            let vset_enabled: Vec<(VectorLabel, Vector3<f64>)> = vset
                 .0
                 .iter()
                 .enumerate()
@@ -142,7 +98,13 @@ pub fn update_flow(
         .collect();
 
     let may_label: Option<String> = match net_vs.get(0) {
-        Some((labels, _)) => Some(labels.join(", ")),
+        Some((labels, _)) => Some(
+            labels
+                .iter()
+                .map(|s| s.clone().0)
+                .collect::<Vec<String>>()
+                .join(", "),
+        ),
         None => None,
     };
     let mut text = q_text.get_single_mut().unwrap();
@@ -151,22 +113,7 @@ pub fn update_flow(
         None => "Flow vector: None".to_string(),
     };
 
-    let all_vs: Vec<Vector3<f64>> = net_vs.iter().map(|(_, v)| v).cloned().collect();
-
-    // Get maximum velocity magnitude.
-    let (min_vel_log, max_vel_log) = all_vs.iter().map(|v| v.magnitude().log10()).fold(
-        (f64::INFINITY, f64::NEG_INFINITY),
-        |(mn, mx): (f64, f64), b| {
-            (
-                if b > f64::NEG_INFINITY { mn.min(b) } else { mn },
-                mx.max(b),
-            )
-        },
-    );
-
-    let g = colorgrad::viridis();
-    println!("Min velocity: {}", min_vel_log);
-    println!("Max velocity: {}", max_vel_log);
+    let v_max_scale = 1e-12;
 
     // Iterate over markers.
     for (i, (_vs, vset_children)) in q_vectorset.iter().enumerate() {
@@ -174,20 +121,21 @@ pub fn update_flow(
         let v = net_vs[i].1;
 
         // Map the flow vector to a magnitude in [0.0, 1.0] normalized on the
-        // max velocity, on a log scale.
-        let mag_scale = (v.magnitude().log10() - min_vel_log) / (max_vel_log - min_vel_log);
-        // Map normalized velocity to a point on the color spectrum.
-        let mag_color = g.at(mag_scale);
+        // max vector, on a log scale.
+        let mag_scale = (v.magnitude() / v_max_scale).min(1.0);
+        // Map normalized vector to a point on the color spectrum.
+
+        // Set the scale of the arrow somewhere between 0 and env.arrow_length based on mag_scale value.
+        let arrow_scale = mag_scale * env.arrow_length;
 
         for &vset_child in vset_children.iter() {
-            let (mut transform, mut visibility, flow_parent_children) =
-                match q_flow_vectors.get_mut(vset_child) {
-                    Ok(x) => x,
-                    Err(_) => continue,
-                };
+            let (mut transform, mut visibility) = match q_flow_vectors.get_mut(vset_child) {
+                Ok(x) => x,
+                Err(_) => continue,
+            };
 
             // If the flow vector is too small, hide it.
-            *visibility = if mag_scale < 0.1 {
+            *visibility = if mag_scale < 0.05 {
                 Visibility::Hidden
             } else {
                 Visibility::Visible
@@ -197,28 +145,15 @@ pub fn update_flow(
             match nalgebra_to_glam_vec(&v).try_normalize() {
                 Some(glam_u) => {
                     *transform =
-                        Transform::from_scale(Vec3::splat(env.transform_coord(env.arrow_length)))
+                        // Transform::from_scale(Vec3::splat(env.transform_coord(env.arrow_length)))
+                        Transform::from_scale(Vec3::splat(env.transform_coord(arrow_scale)))
                             .looking_to(glam_u, Vec3::Z)
                 }
                 None => {
                     *visibility = Visibility::Hidden;
                 }
             };
-
-            // Set the color of each part of the flow vector.
-            for &flow_parent_child in flow_parent_children.iter() {
-                let color_handle = q_vec_flow_children.get(flow_parent_child).unwrap();
-                let color_mat = materials.get_mut(color_handle).unwrap();
-                color_mat.base_color = Color::rgba(
-                    mag_color.r as f32,
-                    mag_color.g as f32,
-                    mag_color.b as f32,
-                    mag_color.a as f32,
-                );
-            }
         }
-        println!("");
-        println!("");
     }
 }
 

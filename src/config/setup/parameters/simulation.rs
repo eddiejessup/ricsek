@@ -11,7 +11,7 @@ pub struct SimParams {
     pub agent_radius: f64,
     pub agent_aspect_ratio: f64,
     // Agent propulsion.
-    pub agent_propulsion_speed: f64,
+    pub agent_propulsion_force: f64,
     // Agent thermal noise.
     pub agent_translational_diffusion_coefficient: f64,
     pub agent_rotational_diffusion_coefficient: f64,
@@ -20,7 +20,8 @@ pub struct SimParams {
     pub agent_agent_hydro_b: f64,
     // Electrostatic repulsion, used for both agent-agent and agent-surface
     // interactions.
-    pub agent_object_hertz_velocity_coefficient: f64,
+    pub agent_object_hertz_force_coefficient: f64,
+    pub agent_mobility: f64,
     // Agent-surface hydrodynamics.
     // Coefficient determining strength of translational and rotational velocity
     // induced by agent-surface interactions.
@@ -30,5 +31,9 @@ pub struct SimParams {
 impl SimParams {
   pub fn to_steps(&self, t: f64) -> usize {
       (t / self.dt).ceil() as usize
+  }
+
+  pub fn agent_propulsion_speed(&self) -> f64 {
+      self.agent_propulsion_force * self.agent_mobility
   }
 }

@@ -6,6 +6,12 @@ pub struct AxisBoundaryConfig {
     pub closed: bool,
 }
 
+impl AxisBoundaryConfig {
+    pub fn l_half(&self) -> f64 {
+        self.l * 0.5
+    }
+}
+
 // Newtype around Vector3<AxisBoundaryConfig> for convenience functions.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct BoundaryConfig(pub Vector3<AxisBoundaryConfig>);

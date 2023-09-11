@@ -2,6 +2,8 @@ use crate::config::setup::parameters::common::BoundaryConfig;
 use bevy::prelude::*;
 use nalgebra::Point3;
 
+use super::common::spawn_arrow;
+
 #[derive(Resource)]
 pub struct Environment {
     pub boundaries: BoundaryConfig,
@@ -42,7 +44,7 @@ pub fn add_environment(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let l = env.transformed_l();
+  let l = env.transformed_l();
     // Need 6 rectangles, 2 for each boundary of the environment.
     // For the boundary along x, the rectangle should have width l.y and height l.z
     // And should be centred at (l.x / 2, 0, 0) and (-l.x / 2, 0, 0)

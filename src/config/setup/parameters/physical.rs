@@ -1,6 +1,6 @@
 use std::f64::consts::PI;
 
-use super::{simulation::SimParams, common::BoundaryConfig};
+use super::{common::BoundaryConfig, simulation::SimParams};
 
 // Derive JSON deserialize for PhysicalParams.
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -35,20 +35,20 @@ pub struct PhysicalParams {
 
 impl PhysicalParams {
     fn agent_stokes_translation_coefficient(&self) -> f64 {
+        // v = F / 6πηa
         6.0 * PI * self.fluid_viscosity * self.agent_radius
     }
 
     fn agent_stokes_rotation_coefficient(&self) -> f64 {
+        // T = 8πηa^3ω
         8.0 * PI * self.fluid_viscosity * self.agent_radius.powi(3)
     }
 
     pub fn agent_stokes_translational_mobility(&self) -> f64 {
-        // F = 6πηav
         1.0 / self.agent_stokes_translation_coefficient()
     }
 
     pub fn agent_stokes_rotational_mobility(&self) -> f64 {
-        // T = 8πηa^3ω
         1.0 / self.agent_stokes_rotation_coefficient()
     }
 
@@ -66,17 +66,9 @@ impl PhysicalParams {
         self.thermal_energy() / self.agent_stokes_rotation_coefficient()
     }
 
-    pub fn agent_stokes_force_to_velocity(&self, f: f64) -> f64 {
-        self.agent_stokes_translational_mobility() * f
-    }
-
     pub fn agent_object_hertz_force_coefficient(&self) -> f64 {
         // Assume sphere for now.
         (4.0 / 3.0) * self.object_stiffness * self.agent_radius.sqrt()
-    }
-
-    pub fn agent_object_hertz_velocity_coefficient(&self) -> f64 {
-        self.agent_stokes_translation_coefficient() * self.agent_object_hertz_force_coefficient()
     }
 
     pub fn agent_obstacle_hydro_strength(&self) -> f64 {
@@ -100,16 +92,15 @@ impl PhysicalParams {
             singularities: self.singularities.clone(),
             agent_radius: self.agent_radius,
             agent_aspect_ratio: self.agent_aspect_ratio,
-            agent_propulsion_speed: self
-                .agent_stokes_force_to_velocity(self.agent_propulsion_force),
+            agent_mobility: self.agent_stokes_translational_mobility(),
+            agent_propulsion_force: self.agent_propulsion_force,
             agent_translational_diffusion_coefficient: self
                 .agent_stokes_translational_diffusion_coefficient(),
             agent_rotational_diffusion_coefficient: self
                 .agent_stokes_rotational_diffusion_coefficient(),
-            agent_object_hertz_velocity_coefficient: self.agent_object_hertz_velocity_coefficient(),
+            agent_object_hertz_force_coefficient: self.agent_object_hertz_force_coefficient(),
             agent_agent_hydro_a: self.agent_agent_hydro_a,
             agent_agent_hydro_b: self.agent_agent_hydro_b,
-            // Capsule hydrodynamics.
             agent_obstacle_hydro_strength: self.agent_obstacle_hydro_strength(),
         }
     }

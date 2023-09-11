@@ -2,11 +2,11 @@ use nalgebra::{Point3, UnitVector3, Vector3};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AgentStepSummary {
-    pub v_agent_electro: Vector3<f64>,
-    pub v_agent_hydro: Vector3<f64>,
-    pub v_propulsion: Vector3<f64>,
-    pub v_boundary_electro: Vector3<f64>,
-    pub v_singularity: Vector3<f64>,
+    pub f_agent_electro: Vector3<f64>,
+    pub f_agent_hydro: Vector3<f64>,
+    pub f_propulsion: Vector3<f64>,
+    pub f_boundary_electro: Vector3<f64>,
+    pub f_singularity: Vector3<f64>,
 }
 
 pub struct SimState {

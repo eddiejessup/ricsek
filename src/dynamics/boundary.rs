@@ -65,24 +65,19 @@ pub fn agent_boundary_electro(
     agent_radius: f64,
     electro_coeff: f64,
 ) -> Vector3<f64> {
-    // Go through each axis
-    // For each axis, find the nearest point on the boundary,
-    // Which is at:
-    // - The same position as 'r' for all non-axis components
-    // - +-l/2 along the axis, depending on the sign of r[i]
-    // Then compute the force due to that boundary,
-    // and accumulate it for each closed axis.
     let mut f_tot = Vector3::zeros();
     for i in 0..3 {
         if !boundaries.0[i].closed {
             continue;
         }
-        let mut nearest_axis_boundary = r.clone();
-        nearest_axis_boundary[i] = boundaries.0[i].l / 2.0 * if r[i] > 0.0 { 1.0 } else { -1.0 };
-        let rc_boundary = nearest_axis_boundary - r;
+
         f_tot += electro_kinematics(
-            UnitVector3::new_normalize(rc_boundary),
-            agent_radius - rc_boundary.magnitude(),
+            UnitVector3::new_normalize(Vector3::ith_axis(i).scale(if r[i] > 0.0 {
+                1.0
+            } else {
+                -1.0
+            })),
+            r[i].abs() + agent_radius - boundaries.0[i].l_half(),
             electro_coeff,
         );
     }

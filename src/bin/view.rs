@@ -1,11 +1,17 @@
 use std::{f32::consts::FRAC_PI_2, time::Duration};
 
-use bevy::{prelude::*, time::common_conditions::on_timer};
+use bevy::{
+    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    pbr::wireframe::WireframePlugin,
+    prelude::*,
+    render::{render_resource::WgpuFeatures, settings::WgpuSettings, RenderPlugin},
+    time::common_conditions::on_timer,
+};
 use ricsek::view::{
-    common::nalgebra_to_glam_vec,
+    common::{nalgebra_to_glam_vec, spawn_arrow},
     environment::Environment,
     flow::FlowViewState,
-    pan_orbit_camera::{add_camera_startup, pan_orbit_camera_update},
+    pan_orbit_camera::{add_camera, pan_orbit_camera_update},
     *,
 };
 use structopt::StructOpt;
@@ -26,44 +32,19 @@ pub fn add_agents(
 
     let radius = config.parameters.agent_radius;
 
-    let materials = [
-        materials.add(StandardMaterial::from(Color::RED)),
-        materials.add(StandardMaterial::from(Color::GREEN)),
-        materials.add(StandardMaterial::from(Color::BLUE)),
-        materials.add(StandardMaterial::from(Color::PURPLE)),
-        materials.add(StandardMaterial::from(Color::CYAN)),
-    ];
+    let material = materials.add(StandardMaterial::from(Color::RED.with_a(0.7)));
 
-    let agent_mesh = meshes.add(
+    let sphere_mesh = meshes.add(
         shape::UVSphere {
             radius: env.transform_coord(radius),
-            ..default()
+            sectors: 18,
+            stacks: 9,
         }
         .into(),
     );
-    let cone: Handle<Mesh> = meshes.add(
-        bevy_more_shapes::Cone {
-            radius: 1.0,
-            height: 1.0,
-            segments: 16,
-        }
-        .into(),
-    );
-    let cylinder_height = 3.0;
-    let cylinder: Handle<Mesh> = meshes.add(
-        shape::Cylinder {
-            radius: 0.3,
-            height: cylinder_height,
-            resolution: 16,
-            ..default()
-        }
-        .into(),
-    );
-
     let transform_mesh = Transform::from_rotation(Quat::from_rotation_x(-FRAC_PI_2));
 
     cur_sim_state.agents.iter().enumerate().for_each(|(i, _a)| {
-        let material = materials[i % 5].clone();
         commands
             .spawn((
                 SpatialBundle::default(),
@@ -72,27 +53,15 @@ pub fn add_agents(
             ))
             .with_children(|point_parent| {
                 point_parent
-                    .spawn((SpatialBundle::default(), AgentId(i)))
+                    .spawn((SpatialBundle::default(), AgentId(i), AgentBody))
                     .with_children(|agent_parent| {
                         agent_parent.spawn(PbrBundle {
-                            mesh: agent_mesh.clone(),
+                            mesh: sphere_mesh.clone(),
                             material: material.clone(),
                             transform: transform_mesh,
                             ..default()
                         });
-                        agent_parent.spawn(PbrBundle {
-                            mesh: cone.clone(),
-                            material: material.clone(),
-                            transform: transform_mesh.with_translation(-Vec3::Z * cylinder_height),
-                            ..default()
-                        });
-                        agent_parent.spawn(PbrBundle {
-                            mesh: cylinder.clone(),
-                            material: material.clone(),
-                            transform: transform_mesh
-                                .with_translation(-Vec3::Z * cylinder_height / 2.0),
-                            ..default()
-                        });
+                        spawn_arrow(agent_parent, &mut meshes, material.clone());
                     });
             });
     });
@@ -107,12 +76,12 @@ fn update_agent_points(
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
     let opt_summary = &cur_sim_state.summary;
-    match opt_summary {
-        None => println!("No agent summary for view_i: {}", view_i),
-        Some(_) => println!("Agent summary for view_i: {}", view_i),
-    };
+    // match opt_summary {
+    //     None => println!("No agent summary for view_i: {}", view_i),
+    //     Some(_) => println!("Agent summary for view_i: {}", view_i),
+    // };
 
-    println!("Updating positions for agents, to view_i: {}", view_i);
+    // println!("Updating positions for agents, to view_i: {}", view_i);
     for (agent_id, mut vector_set, mut transform) in &mut q_point {
         let agent = &cur_sim_state.agents[agent_id.0];
         *transform = Transform::from_translation(env.transformed_vec3(agent.r));
@@ -120,14 +89,26 @@ fn update_agent_points(
         if let Some(agent_summaries) = opt_summary {
             let agent_summary = &agent_summaries[agent_id.0];
             *vector_set = flow::VectorSet(vec![
-                ("agent_electro".to_string(), agent_summary.v_agent_electro),
-                ("agent_hydro".to_string(), agent_summary.v_agent_hydro),
-                ("propulsion".to_string(), agent_summary.v_propulsion),
                 (
-                    "boundary_electro".to_string(),
-                    agent_summary.v_boundary_electro,
+                    flow::VectorLabel("agent_electro".to_string()),
+                    agent_summary.f_agent_electro,
                 ),
-                ("singularity".to_string(), agent_summary.v_singularity),
+                (
+                    flow::VectorLabel("agent_hydro".to_string()),
+                    agent_summary.f_agent_hydro,
+                ),
+                (
+                    flow::VectorLabel("propulsion".to_string()),
+                    agent_summary.f_propulsion,
+                ),
+                (
+                    flow::VectorLabel("boundary_electro".to_string()),
+                    agent_summary.f_boundary_electro,
+                ),
+                (
+                    flow::VectorLabel("singularity".to_string()),
+                    agent_summary.f_singularity,
+                ),
             ])
         }
     }
@@ -136,11 +117,11 @@ fn update_agent_points(
 fn update_agent_orientations(
     sim_states: Res<SimStates>,
     view_state: Res<ViewState>,
-    mut q_ag: Query<(&AgentId, &mut Transform)>,
+    mut q_ag: Query<(&AgentId, &mut Transform), With<AgentBody>>,
 ) {
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
-    println!("Updating orientations for agents, to view_i: {}", view_i);
+    // println!("Updating orientations for agents, to view_i: {}", view_i);
     for (agent_id, mut transform) in &mut q_ag {
         let agent = &cur_sim_state.agents[agent_id.0];
         *transform = Transform::IDENTITY.looking_to(nalgebra_to_glam_vec(&agent.u), Vec3::Z);
@@ -216,20 +197,33 @@ fn main() {
 
     let env = Environment {
         boundaries: setup.parameters.boundaries.clone(),
-        arrow_length: 3.0e-6,
+        arrow_length: 2.0e-6,
         length_factor: 1e6,
     };
 
     println!("Got {} sim-states", sim_states.len());
 
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins((
+            DefaultPlugins.set(RenderPlugin {
+                wgpu_settings: WgpuSettings {
+                    features: WgpuFeatures::POLYGON_MODE_LINE,
+                    ..default()
+                },
+            }),
+            WireframePlugin,
+        ))
+        .add_plugins((
+            LogDiagnosticsPlugin::default(),
+            FrameTimeDiagnosticsPlugin::default(),
+        ))
         .insert_resource(env)
         .insert_resource(SimStates(sim_states))
         .insert_resource(SetupRes(setup))
         .insert_resource(FlowViewState::new(10000))
         .insert_resource(ViewState::default())
-        .add_systems(Startup, (add_camera_startup, add_agents))
+        .add_systems(Startup, add_camera)
+        .add_systems(Startup, add_agents)
         .add_systems(Startup, environment::add_environment)
         .add_systems(PostStartup, flow::add_flow)
         .add_systems(Update, pan_orbit_camera_update)

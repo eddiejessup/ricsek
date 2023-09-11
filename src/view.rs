@@ -13,10 +13,7 @@ pub const TIME_STEP: f64 = 1.0 / 160.0;
 pub struct AgentId(pub usize);
 
 #[derive(Component)]
-pub struct AgentDirectionId(pub usize);
-
-#[derive(Component)]
-pub struct Movable;
+pub struct AgentBody;
 
 #[derive(Resource)]
 pub struct ViewState {

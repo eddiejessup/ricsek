@@ -1,11 +1,11 @@
-use nalgebra::{Vector2, Point2, Vector3, Point3};
+use nalgebra::{Point2, Point3, Vector2, Vector3};
 
 pub mod capsule;
 pub mod point;
 
 pub fn arange(start: f64, stop: f64, step: f64) -> Vec<f64> {
-  let n = ((stop - start) / step).ceil() as usize;
-  (0..n).map(|i| start + i as f64 * step).collect()
+    let n = ((stop - start) / step).ceil() as usize;
+    (0..n).map(|i| start + i as f64 * step).collect()
 }
 
 pub fn linspace(start: f64, stop: f64, n: usize) -> Vec<f64> {
@@ -13,21 +13,31 @@ pub fn linspace(start: f64, stop: f64, n: usize) -> Vec<f64> {
     (0..n).map(|i| start + i as f64 * step).collect()
 }
 
-pub fn grid(l: Vector3<f64>, n: usize) -> Vec<Point3<f64>> {
-  // step ^ 3 * n-arrows = lx * ly * lz
-  // step = cube-root(lx * ly * lz / n-arrows)
-  let step = (l.x * l.y * l.z / n as f64).powf(1.0 / 3.0);
-  let l_half = l / 2.0;
+pub fn grid_2d(l: Vector2<f64>, step: f64) -> Vec<Point2<f64>> {
+    let l_half = l / 2.0;
 
-  let mut samples: Vec<Point3<f64>> = Vec::new();
-  for x in arange(-l_half.x, l_half.x, step) {
-      for y in arange(-l_half.y, l_half.y, step) {
-          for z in arange(-l_half.z, l_half.z, step) {
-              samples.push(Point3::new(x, y, z));
-          }
-      }
-  }
-  samples
+    let mut samples: Vec<Point2<f64>> = Vec::new();
+    for x in arange(-l_half.x, l_half.x, step) {
+        for y in arange(-l_half.y, l_half.y, step) {
+            samples.push(Point2::new(x, y));
+        }
+    }
+    samples
+}
+
+pub fn grid(l: Vector3<f64>, n: usize) -> Vec<Point3<f64>> {
+    // step ^ 3 * n-arrows = lx * ly * lz
+    // step = cube-root(lx * ly * lz / n-arrows)
+    let step = (l.x * l.y * l.z / n as f64).powf(1.0 / 3.0);
+    let l_half = l / 2.0;
+
+    let mut samples: Vec<Point3<f64>> = Vec::new();
+    for z in arange(-l_half.z, l_half.z, step) {
+        for p in grid_2d(Vector2::new(l.x, l.y), step) {
+            samples.push(Point3::new(p.x, p.y, z));
+        }
+    }
+    samples
 }
 
 pub fn linspace_grid(start: f64, stop: f64, n: usize) -> Vec<Point2<f64>> {
@@ -42,7 +52,6 @@ pub fn angle_to_x(v: &Vector2<f64>) -> f64 {
     if v.y < 0.0 {
         2.0 * std::f64::consts::PI - angle
     } else {
-      angle
-
+        angle
     }
 }

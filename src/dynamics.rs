@@ -34,15 +34,15 @@ pub fn update(
         // Fluid velocity and rotation.
 
         // Agent-agent electrostatic repulsion.
-        let v_agent_electro = agent_agents_electro(
+        let f_agent_electro = agent_agents_electro(
             i,
             &r1c_r2cs,
             sim_params.agent_radius,
-            sim_params.agent_object_hertz_velocity_coefficient,
+            sim_params.agent_object_hertz_force_coefficient,
         );
 
         // Agent-agent hydrodynamic force.
-        let v_agent_hydro = agent_agents_hydro(
+        let f_agent_hydro = agent_agents_hydro(
             i,
             &r1c_r2cs,
             agent.u.scale(sim_params.agent_agent_hydro_a),
@@ -50,28 +50,28 @@ pub fn update(
         );
 
         // Agent propulsion.
-        let v_propulsion = agent.u.into_inner() * sim_params.agent_propulsion_speed;
+        let f_propulsion = agent.u.into_inner() * sim_params.agent_propulsion_force;
 
         // Agent-boundary electrostatic repulsion.
-        let v_boundary_electro = boundary::agent_boundary_electro(
+        let f_boundary_electro = boundary::agent_boundary_electro(
             agent.r,
             &sim_params.boundaries,
             sim_params.agent_radius,
-            sim_params.agent_object_hertz_velocity_coefficient,
+            sim_params.agent_object_hertz_force_coefficient,
         );
 
         // Agent-singularity force.
-        let v_singularity = sim_params
+        let f_singularity = sim_params
             .singularities
             .iter()
             .map(|singularity| singularity.eval(agent.r))
             .sum::<Vector3<f64>>();
 
-        let v_net =
-            v_agent_electro + v_agent_hydro + v_propulsion + v_boundary_electro + v_singularity;
+        let f_net =
+            f_agent_electro + f_agent_hydro + f_propulsion + f_boundary_electro + f_singularity;
 
         // Update agent position from velocity.
-        agent.r += v_net * sim_params.dt;
+        agent.r += f_net * sim_params.agent_mobility * sim_params.dt;
         // Compute translational diffusion translation.
         agent.r += random_vector(rng, trans_diff_distr);
 
@@ -84,11 +84,11 @@ pub fn update(
         agent.u = rot * agent.u;
 
         agent_summaries.push(AgentStepSummary {
-            v_agent_electro,
-            v_agent_hydro,
-            v_propulsion,
-            v_boundary_electro,
-            v_singularity,
+            f_agent_electro,
+            f_agent_hydro,
+            f_propulsion,
+            f_boundary_electro,
+            f_singularity,
         });
     }
 
