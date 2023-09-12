@@ -8,12 +8,42 @@ use std::f64::consts::PI;
 
 use crate::config::run::RunConfig;
 use crate::config::setup::parameters::simulation::SimParams;
-use crate::dynamics::agent::{agent_agents_electro, agent_agents_hydro};
+use crate::dynamics::agent::agent_agents_electro;
 use crate::dynamics::brownian::{rot_brownian_distr, trans_brownian_distr};
-use crate::math::point::random_vector;
+use crate::geometry::point::random_vector;
+use crate::geometry::sphere::Sphere;
 use crate::state::*;
-use nalgebra::Vector3;
+use nalgebra::{Point3, Vector3};
 use rand_distr::{Normal, Uniform};
+
+pub fn fluid_v_at(sim_params: &SimParams, r: Point3<f64>) -> Vector3<f64> {
+    // Singularity contribution to flow.
+    let v_fluid_singularity = sim_params
+        .singularities
+        .iter()
+        .map(|singularity| singularity.eval(r))
+        .sum::<Vector3<f64>>();
+    // Other-agent contribution to flow.
+    let v_fluid_agents = Vector3::zeros();
+    v_fluid_singularity + v_fluid_agents
+}
+
+pub fn force_balance_v(sim_params: &SimParams, r: &mut Point3<f64>, f: Vector3<f64>) {
+    // Agent-boundary electrostatic repulsion.
+    let f_boundary_electro = boundary::boundary_electro(
+        &Sphere {
+            point: *r,
+            radius: sim_params.agent_radius,
+        },
+        &sim_params.boundaries,
+        sim_params.agent_object_hertz_force_coefficient,
+    );
+
+    let f_tot = f + f_boundary_electro;
+    let v = fluid_v_at(sim_params, *r) + f_tot.scale(sim_params.agent_mobility);
+    // Update agent position from velocity.
+    *r += v * sim_params.dt;
+}
 
 pub fn update(
     sim_params: &SimParams,
@@ -25,70 +55,59 @@ pub fn update(
     let uniform_theta = Uniform::new(0.0, 2.0 * PI);
     let uniform_cos_phi = Uniform::new(-1.0, 1.0);
 
-    let agent_rs = sim_state.agents.iter().map(|a| a.r).collect::<Vec<_>>();
+    let agents = sim_state.agents.clone();
 
     let mut agent_summaries: Vec<AgentStepSummary> = vec![];
-    for (i, agent) in sim_state.agents.iter_mut().enumerate() {
-        let r1c_r2cs = boundary::pairwise_dist(agent.r, &agent_rs, &sim_params.boundaries);
+    for (i, mut agent) in sim_state.agents.iter_mut().enumerate() {
+        // let r1_r21s = boundary::pairwise_dist(agent.r1, &agent_r1s, &sim_params.boundaries);
+        // let r1_r22s = boundary::pairwise_dist(agent.r1, &agent_r2s, &sim_params.boundaries);
+        // let r2_r21s = boundary::pairwise_dist(agent.r2, &agent_r1s, &sim_params.boundaries);
+        // let r2_r22s = boundary::pairwise_dist(agent.r2, &agent_r2s, &sim_params.boundaries);
+        let r_seg_r2_segs = boundary::pairwise_agent_dist(agent, &agents, &sim_params.boundaries);
 
         // Fluid velocity and rotation.
 
-        // Agent-agent electrostatic repulsion.
-        let f_agent_electro = agent_agents_electro(
-            i,
-            &r1c_r2cs,
-            sim_params.agent_radius,
-            sim_params.agent_object_hertz_force_coefficient,
-        );
-
-        // Agent-agent hydrodynamic force.
-        let f_agent_hydro = agent_agents_hydro(
-            i,
-            &r1c_r2cs,
-            agent.u.scale(sim_params.agent_agent_hydro_a),
-            agent.u.scale(sim_params.agent_agent_hydro_b),
-        );
-
         // Agent propulsion.
-        let f_propulsion = agent.u.into_inner() * sim_params.agent_propulsion_force;
-
-        // Agent-boundary electrostatic repulsion.
-        let f_boundary_electro = boundary::agent_boundary_electro(
-            agent.r,
-            &sim_params.boundaries,
+        let f1_propulsion = agent.u().into_inner() * sim_params.agent_propulsion_force;
+        let f1_spring = agent.r1_stretch_force(
+            sim_params.agent_inter_sphere_length(),
+            sim_params.agent_linear_spring_stiffness,
+        );
+        // Agent-agent electrostatic repulsion.
+        let f_electro = agent_agents_electro(
+            i,
+            &r_seg_r2_segs,
             sim_params.agent_radius,
             sim_params.agent_object_hertz_force_coefficient,
         );
 
-        // Agent-singularity force.
-        let f_singularity = sim_params
-            .singularities
-            .iter()
-            .map(|singularity| singularity.eval(agent.r))
-            .sum::<Vector3<f64>>();
+        force_balance_v(
+            sim_params,
+            &mut agent.seg.start,
+            f1_propulsion + f1_spring + f_electro,
+        );
+        force_balance_v(sim_params, &mut agent.seg.end, -f1_spring + f_electro);
 
-        let f_net =
-            f_agent_electro + f_agent_hydro + f_propulsion + f_boundary_electro + f_singularity;
-
-        // Update agent position from velocity.
-        agent.r += f_net * sim_params.agent_mobility * sim_params.dt;
         // Compute translational diffusion translation.
-        agent.r += random_vector(rng, trans_diff_distr);
-
-        // Apply periodic boundary condition.
-        boundary::wrap_inplace(&mut agent.r, &sim_params.boundaries);
+        agent.seg.translate(random_vector(rng, trans_diff_distr));
 
         // Compute rotational diffusion rotation.
-        let rot = brownian::random_rotation(rng, &uniform_theta, &uniform_cos_phi, &rot_diff_distr);
-        // Perform the rotation.
-        agent.u = rot * agent.u;
+        agent.seg.rotate(brownian::random_rotation(
+            rng,
+            &uniform_theta,
+            &uniform_cos_phi,
+            &rot_diff_distr,
+        ));
+
+        // Apply periodic boundary condition.
+        boundary::wrap_agent_inplace(&mut agent, &sim_params.boundaries);
 
         agent_summaries.push(AgentStepSummary {
-            f_agent_electro,
-            f_agent_hydro,
-            f_propulsion,
-            f_boundary_electro,
-            f_singularity,
+            f_agent_electro: Vector3::zeros(),
+            f_agent_hydro: Vector3::zeros(),
+            f_propulsion: Vector3::zeros(),
+            f_boundary_electro: Vector3::zeros(),
+            f_singularity: Vector3::zeros(),
         });
     }
 

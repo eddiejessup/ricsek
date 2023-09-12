@@ -14,12 +14,14 @@ pub struct Env {
 pub struct Agent {
     pub agent_id: i32,
     pub env_id: i32,
-    pub rx: f64,
-    pub ry: f64,
-    pub rz: f64,
-    pub ux: f64,
-    pub uy: f64,
-    pub uz: f64,
+    pub r1x: f64,
+    pub r1y: f64,
+    pub r1z: f64,
+    pub r2x: f64,
+    pub r2y: f64,
+    pub r2z: f64,
+    pub th1: f64,
+    pub th2: f64,
     pub step_summary: Option<serde_json::Value>,
 }
 

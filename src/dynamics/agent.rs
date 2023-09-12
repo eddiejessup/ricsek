@@ -8,7 +8,7 @@ pub fn agent_agent_electro(
     electro_coeff: f64,
 ) -> Vector3<f64> {
     electro_kinematics(
-        UnitVector3::new_normalize(*r1c_r2c),
+        UnitVector3::new_normalize(-*r1c_r2c),
         2.0 * agent_radius - r1c_r2c.magnitude(),
         electro_coeff,
     )

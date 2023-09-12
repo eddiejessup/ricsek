@@ -9,7 +9,8 @@ pub struct SimParams {
     pub singularities: Vec<super::singularities::Singularity>,
     // Agent shape.
     pub agent_radius: f64,
-    pub agent_aspect_ratio: f64,
+    pub agent_rod_length: f64,
+    pub agent_linear_spring_stiffness: f64,
     // Agent propulsion.
     pub agent_propulsion_force: f64,
     // Agent thermal noise.
@@ -31,6 +32,10 @@ pub struct SimParams {
 impl SimParams {
   pub fn to_steps(&self, t: f64) -> usize {
       (t / self.dt).ceil() as usize
+  }
+
+  pub fn agent_inter_sphere_length(&self) -> f64 {
+      self.agent_rod_length + 2.0 * self.agent_radius
   }
 
   pub fn agent_propulsion_speed(&self) -> f64 {

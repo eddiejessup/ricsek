@@ -2,6 +2,9 @@ use nalgebra::{Point2, Point3, Vector2, Vector3};
 
 pub mod capsule;
 pub mod point;
+pub mod line_segment;
+pub mod sphere;
+pub mod closest;
 
 pub fn arange(start: f64, stop: f64, step: f64) -> Vec<f64> {
     let n = ((stop - start) / step).ceil() as usize;

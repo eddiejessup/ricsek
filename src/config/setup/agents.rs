@@ -1,4 +1,4 @@
-use crate::math::point::{random_unit_vector, random_vector};
+use crate::geometry::point::{random_unit_vector, random_vector};
 use crate::state::{self, *};
 
 use nalgebra::{Point3, UnitVector3, Vector3};
@@ -43,16 +43,17 @@ pub fn random_uniform_positions(
         .collect()
 }
 
-fn random_uniform_agents(rng: &mut ThreadRng, n: usize, l: Vector3<f64>) -> Vec<state::Agent> {
+fn random_uniform_agents(rng: &mut ThreadRng, n: usize, l: Vector3<f64>, d: f64) -> Vec<state::Agent> {
     let rs = random_uniform_positions(rng, n, l);
     let us = random_uniform_orientations(rng, n);
-    (0..n).map(|i| Agent { r: rs[i], u: us[i] }).collect()
+    (0..n).map(|i| Agent::new(rs[i], us[i].scale(d))).collect()
 }
 
 pub fn initialize_agents(
     rng: &mut ThreadRng,
     config: AgentInitializationConfig,
     l: Vector3<f64>,
+    d: f64,
 ) -> Vec<Agent> {
     match config {
         AgentInitializationConfig::RandomUniformByVolumeNumberDensity(
@@ -61,10 +62,10 @@ pub fn initialize_agents(
             },
         ) => {
             let n = (volume_number_density * l.x * l.y * l.z).round() as usize;
-            random_uniform_agents(rng, n, l)
+            random_uniform_agents(rng, n, l, d)
         }
         AgentInitializationConfig::RandomUniformByNumber(AgentNumberConfig { number }) => {
-            random_uniform_agents(rng, number, l)
+            random_uniform_agents(rng, number, l, d)
         }
         AgentInitializationConfig::Explicit(ExplicitAgentConfig { agents }) => agents,
     }

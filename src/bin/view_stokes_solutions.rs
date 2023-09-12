@@ -130,7 +130,7 @@ fn main() {
     let sample_l = nalgebra::Vector2::new(env.boundaries.l().x, env.boundaries.l().y);
     let sample_z = env.boundaries.l_half().z;
     let step = 10.0e-6;
-    for p in ricsek::math::grid_2d(sample_l, step) {
+    for p in ricsek::geometry::grid_2d(sample_l, step) {
         sample_rs.push(Point3::new(p.x, p.y, sample_z));
         sample_rs.push(Point3::new(p.x, p.y, -sample_z));
     }

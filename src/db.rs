@@ -1,9 +1,10 @@
 use crate::config::setup::SetupConfig;
+use crate::geometry::line_segment::LineSegment;
 use crate::state::*;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenvy::dotenv;
-use nalgebra::{Point3, UnitVector3, Vector3};
+use nalgebra::Point3;
 use std::env;
 use time;
 
@@ -62,12 +63,14 @@ pub fn write_checkpoint(
             (
                 agent_id.eq(aid as i32),
                 env_id.eq(eid),
-                rx.eq(a.r.x),
-                ry.eq(a.r.y),
-                rz.eq(a.r.z),
-                ux.eq(a.u.x),
-                uy.eq(a.u.y),
-                uz.eq(a.u.z),
+                r1x.eq(a.r1().x),
+                r1y.eq(a.r1().y),
+                r1z.eq(a.r1().z),
+                r2x.eq(a.r2().x),
+                r2y.eq(a.r2().y),
+                r2z.eq(a.r2().z),
+                th1.eq(a.th1),
+                th2.eq(a.th2),
                 step_summary.eq(summary
                     .as_ref()
                     .map(|ss| serde_json::to_value(&ss[aid]).unwrap())),
@@ -120,14 +123,22 @@ pub fn env_to_sim_state(conn: &mut PgConnection, env: &models::Env) -> SimState 
     let agents: Vec<Agent> = agent_vals
         .iter()
         .map(|a| Agent {
-            r: Point3::new(a.rx, a.ry, a.rz),
-            u: UnitVector3::new_normalize(Vector3::new(a.ux, a.uy, a.uz)),
+            seg: LineSegment {
+              start: Point3::new(a.r1x, a.r1y, a.r1z),
+              end: Point3::new(a.r2x, a.r2y, a.r2z),
+            },
+            th1: a.th1,
+            th2: a.th2,
         })
         .collect();
 
     let summary: Option<Vec<AgentStepSummary>> = agent_vals
         .iter()
-        .map(|a| a.step_summary.as_ref().and_then(|ss| serde_json::from_value(ss.clone()).ok()))
+        .map(|a| {
+            a.step_summary
+                .as_ref()
+                .and_then(|ss| serde_json::from_value(ss.clone()).ok())
+        })
         .collect();
 
     SimState {

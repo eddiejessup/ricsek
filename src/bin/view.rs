@@ -7,14 +7,21 @@ use bevy::{
     render::{render_resource::WgpuFeatures, settings::WgpuSettings, RenderPlugin},
     time::common_conditions::on_timer,
 };
+use nalgebra::Point3;
 use ricsek::view::{
-    common::{nalgebra_to_glam_vec, spawn_arrow},
+    common::nalgebra_to_glam_vec,
     environment::Environment,
     flow::FlowViewState,
     pan_orbit_camera::{add_camera, pan_orbit_camera_update},
     *,
 };
 use structopt::StructOpt;
+
+#[derive(Component)]
+pub struct AgentBackEnd;
+
+#[derive(Component)]
+pub struct AgentFrontEnd;
 
 pub fn add_agents(
     mut commands: Commands,
@@ -32,7 +39,8 @@ pub fn add_agents(
 
     let radius = config.parameters.agent_radius;
 
-    let material = materials.add(StandardMaterial::from(Color::RED.with_a(0.7)));
+    let back_material = materials.add(StandardMaterial::from(Color::GREEN.with_a(0.9)));
+    let front_material = materials.add(StandardMaterial::from(Color::RED.with_a(0.9)));
 
     let sphere_mesh = meshes.add(
         shape::UVSphere {
@@ -46,23 +54,34 @@ pub fn add_agents(
 
     cur_sim_state.agents.iter().enumerate().for_each(|(i, _a)| {
         commands
+            // Represents the point, don't adjust its orientation,
+            // just translate it to the agent's centre-of-mass position.
             .spawn((
                 SpatialBundle::default(),
                 AgentId(i),
                 flow::VectorSet(vec![]),
             ))
             .with_children(|point_parent| {
-                point_parent
-                    .spawn((SpatialBundle::default(), AgentId(i), AgentBody))
-                    .with_children(|agent_parent| {
-                        agent_parent.spawn(PbrBundle {
-                            mesh: sphere_mesh.clone(),
-                            material: material.clone(),
-                            transform: transform_mesh,
-                            ..default()
-                        });
-                        spawn_arrow(agent_parent, &mut meshes, material.clone());
-                    });
+                point_parent.spawn((
+                    PbrBundle {
+                        mesh: sphere_mesh.clone(),
+                        material: back_material.clone(),
+                        transform: transform_mesh,
+                        ..default()
+                    },
+                    AgentId(i),
+                    AgentBody { back: true },
+                ));
+                point_parent.spawn((
+                    PbrBundle {
+                        mesh: sphere_mesh.clone(),
+                        material: front_material.clone(),
+                        transform: transform_mesh,
+                        ..default()
+                    },
+                    AgentId(i),
+                    AgentBody { back: false },
+                ));
             });
     });
 }
@@ -84,7 +103,7 @@ fn update_agent_points(
     // println!("Updating positions for agents, to view_i: {}", view_i);
     for (agent_id, mut vector_set, mut transform) in &mut q_point {
         let agent = &cur_sim_state.agents[agent_id.0];
-        *transform = Transform::from_translation(env.transformed_vec3(agent.r));
+        *transform = Transform::from_translation(env.transformed_vec3(agent.seg.centroid()));
 
         if let Some(agent_summaries) = opt_summary {
             let agent_summary = &agent_summaries[agent_id.0];
@@ -115,16 +134,21 @@ fn update_agent_points(
 }
 
 fn update_agent_orientations(
+    env: Res<Environment>,
     sim_states: Res<SimStates>,
     view_state: Res<ViewState>,
-    mut q_ag: Query<(&AgentId, &mut Transform), With<AgentBody>>,
+    mut q_ag: Query<(&AgentId, &mut Transform, &AgentBody)>,
 ) {
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
     // println!("Updating orientations for agents, to view_i: {}", view_i);
-    for (agent_id, mut transform) in &mut q_ag {
+    for (agent_id, mut transform, agent_body) in &mut q_ag {
         let agent = &cur_sim_state.agents[agent_id.0];
-        *transform = Transform::IDENTITY.looking_to(nalgebra_to_glam_vec(&agent.u), Vec3::Z);
+        *transform = Transform::from_translation(env.transformed_vec3(
+            Point3::origin()
+                + agent.seg.start_end() * 0.5 * (if agent_body.back { -1.0 } else { 1.0 }),
+        ))
+        .looking_to(nalgebra_to_glam_vec(&agent.u()), Vec3::Z);
     }
 }
 

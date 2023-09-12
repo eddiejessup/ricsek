@@ -10,6 +10,7 @@ fn main() {
         &mut rng,
         init_config.clone(),
         sim_params.boundaries.l(),
+        sim_params.agent_inter_sphere_length(),
     )).collect();
     println!("Initialized {} agents", agents.len());
 

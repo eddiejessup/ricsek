@@ -12,7 +12,9 @@ pub struct PhysicalParams {
     pub singularities: Vec<super::singularities::Singularity>,
     // Agent shape.
     pub agent_radius: f64,
-    pub agent_aspect_ratio: f64,
+    // Length includes the 'caps'.
+    pub agent_length: f64,
+    pub agent_linear_spring_stiffness: f64,
     // Stiffness of both agents and surfaces.
     // (Used to compute the strength of agent-{agent, surface} electrostatics)
     pub object_stiffness: f64,
@@ -34,14 +36,37 @@ pub struct PhysicalParams {
 }
 
 impl PhysicalParams {
+  pub fn agent_rod_length(&self) -> f64 {
+    // Get length of the cylinder part.
+    let r = self.agent_length - 2.0 * self.agent_radius;
+    if r < 0.0 {
+        panic!("Agent length must be greater than 2 * agent radius.")
+    } else {
+        r
+    }
+}
+
+    fn agent_volume(&self) -> f64 {
+      // Volume of a cylinder plus two end-half-spheres.
+      (PI * self.agent_radius.powi(2) * self.agent_rod_length())
+      +
+      (4.0 / 3.0) * PI * self.agent_radius.powi(3)
+    }
+
+    fn agent_effective_radius(&self) -> f64 {
+        // Volume of a sphere with the same volume as the agent.
+        (3.0 * self.agent_volume() / (4.0 * PI)).powf(1.0 / 3.0)
+    }
+
+    // TODO: This assumes a sphere, but we're using a spherocylinder.
     fn agent_stokes_translation_coefficient(&self) -> f64 {
         // v = F / 6πηa
-        6.0 * PI * self.fluid_viscosity * self.agent_radius
+        6.0 * PI * self.fluid_viscosity * self.agent_effective_radius()
     }
 
     fn agent_stokes_rotation_coefficient(&self) -> f64 {
         // T = 8πηa^3ω
-        8.0 * PI * self.fluid_viscosity * self.agent_radius.powi(3)
+        8.0 * PI * self.fluid_viscosity * self.agent_effective_radius().powi(3)
     }
 
     pub fn agent_stokes_translational_mobility(&self) -> f64 {
@@ -67,8 +92,7 @@ impl PhysicalParams {
     }
 
     pub fn agent_object_hertz_force_coefficient(&self) -> f64 {
-        // Assume sphere for now.
-        (4.0 / 3.0) * self.object_stiffness * self.agent_radius.sqrt()
+        (4.0 / 3.0) * self.object_stiffness * self.agent_effective_radius().sqrt()
     }
 
     pub fn agent_obstacle_hydro_strength(&self) -> f64 {
@@ -91,7 +115,8 @@ impl PhysicalParams {
             boundaries: self.boundaries.clone(),
             singularities: self.singularities.clone(),
             agent_radius: self.agent_radius,
-            agent_aspect_ratio: self.agent_aspect_ratio,
+            agent_rod_length: self.agent_rod_length(),
+            agent_linear_spring_stiffness: self.agent_linear_spring_stiffness,
             agent_mobility: self.agent_stokes_translational_mobility(),
             agent_propulsion_force: self.agent_propulsion_force,
             agent_translational_diffusion_coefficient: self

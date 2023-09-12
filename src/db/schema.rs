@@ -4,12 +4,14 @@ diesel::table! {
     agent (agent_id, env_id) {
         agent_id -> Int4,
         env_id -> Int4,
-        rx -> Float8,
-        ry -> Float8,
-        rz -> Float8,
-        ux -> Float8,
-        uy -> Float8,
-        uz -> Float8,
+        r1x -> Float8,
+        r1y -> Float8,
+        r1z -> Float8,
+        r2x -> Float8,
+        r2y -> Float8,
+        r2z -> Float8,
+        th1 -> Float8,
+        th2 -> Float8,
         step_summary -> Nullable<Jsonb>,
     }
 }

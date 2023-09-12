@@ -1,5 +1,4 @@
 use bevy::input::mouse::{MouseMotion, MouseWheel};
-use bevy::pbr::wireframe::WireframeConfig;
 use bevy::prelude::*;
 
 use super::environment::Environment;
