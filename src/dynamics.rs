@@ -11,10 +11,9 @@ use crate::config::setup::parameters::simulation::SimParams;
 use crate::dynamics::agent::agent_agents_electro;
 use crate::dynamics::brownian::{rot_brownian_distr, trans_brownian_distr};
 use crate::geometry::point::random_vector;
-use crate::geometry::sphere::Sphere;
 use crate::state::*;
 use log::{debug, info};
-use nalgebra::{Point3, Vector3, UnitVector3, Rotation3};
+use nalgebra::{Point3, Rotation3, UnitVector3, Vector3};
 use rand_distr::{Normal, Uniform};
 
 pub fn fluid_v_at(sim_params: &SimParams, r: Point3<f64>) -> Vector3<f64> {
@@ -30,21 +29,8 @@ pub fn fluid_v_at(sim_params: &SimParams, r: Point3<f64>) -> Vector3<f64> {
 }
 
 pub fn force_balance_v(sim_params: &SimParams, r: &mut Point3<f64>, f: Vector3<f64>) {
-    // Agent-boundary electrostatic repulsion.
-    let f_boundary_electro = boundary::boundary_electro(
-        &Sphere {
-            point: *r,
-            radius: sim_params.agent_radius,
-        },
-        &sim_params.boundaries,
-        sim_params.agent_object_hertz_force_coefficient,
-    );
-
-    let f_tot = f + f_boundary_electro;
-    let v = fluid_v_at(sim_params, *r) + f_tot * sim_params.agent_translational_mobility;
-    debug!("Specific forces: {}", 1e12 * f);
-    debug!("Boundary electro force: {}", 1e12 * f_boundary_electro);
-    debug!("Total force: {}", 1e12 * f_tot);
+    let v = fluid_v_at(sim_params, *r) + f * sim_params.agent_translational_mobility;
+    debug!("Non-fluid force: {}", 1e12 * f);
     debug!("Body part velocity: {}", 1e6 * v);
     // Update agent position from velocity.
     let dr = v * sim_params.dt;
@@ -70,6 +56,7 @@ pub fn update(
 
         // Agent propulsion.
         let f1_propulsion = agent.u().into_inner() * sim_params.agent_propulsion_force;
+        // Intra-agent linear spring.
         let f1_spring = agent.r1_stretch_force(
             sim_params.agent_inter_sphere_length,
             sim_params.agent_linear_spring_stiffness,
@@ -83,20 +70,35 @@ pub fn update(
             sim_params.agent_radius,
             sim_params.agent_object_hertz_force_coefficient,
         );
+        // Agent-boundary electrostatic repulsion.
+        let (f_boundary_electro, torque_boundary_electro) = boundary::boundary_electro(
+            agent,
+            sim_params.agent_radius,
+            &sim_params.boundaries,
+            sim_params.agent_object_hertz_force_coefficient,
+        );
 
         debug!("Doing force balance calculation for back end");
         force_balance_v(
             sim_params,
             &mut agent.seg.start,
-            f1_propulsion + f1_spring + f_agent_electro,
+            f1_propulsion + f1_spring + f_agent_electro + f_boundary_electro,
         );
         debug!("Doing force balance calculation for front end");
-        force_balance_v(sim_params, &mut agent.seg.end, -f1_spring + f_agent_electro);
+        force_balance_v(
+            sim_params,
+            &mut agent.seg.end,
+            -f1_spring + f_agent_electro + f_boundary_electro,
+        );
 
-        let angular_v_electro = torque_agent_electro * sim_params.agent_rotational_mobility;
-        let theta_electro = angular_v_electro * sim_params.dt;
-        let rot_electro =
-            Rotation3::from_axis_angle(&UnitVector3::new_normalize(theta_electro), theta_electro.norm());
+        let torque_tot = torque_boundary_electro + torque_agent_electro;
+
+        let angular_v = torque_tot * sim_params.agent_rotational_mobility;
+        let angular_theta = angular_v * sim_params.dt;
+        let rot_electro = Rotation3::from_axis_angle(
+            &UnitVector3::new_normalize(angular_theta),
+            angular_theta.norm(),
+        );
 
         // Compute translational diffusion translation.
         agent.seg.translate(random_vector(rng, trans_diff_distr));
@@ -115,7 +117,8 @@ pub fn update(
             torque_agent_electro,
             f_agent_hydro: Vector3::zeros(),
             f_propulsion: f1_propulsion,
-            f_boundary_electro: Vector3::zeros(),
+            torque_boundary_electro,
+            f_boundary_electro,
             f_singularity: Vector3::zeros(),
         });
     }

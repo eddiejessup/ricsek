@@ -1,13 +1,11 @@
-use log::debug;
-use nalgebra::{Point3, Vector3};
+use nalgebra::{Point3, UnitVector3, Vector3};
 
 use crate::{
     config::setup::parameters::common::{AxisBoundaryConfig, BoundaryConfig},
-    geometry::closest::Closest,
     state::Agent,
 };
 
-use super::electro::electro_kinematics;
+use super::{agent::agent_x_electro, electro::electro_kinematics};
 
 fn wrap1(com: f64, x: f64, l: f64) -> f64 {
     match (com / (l * 0.5)) as i64 {
@@ -88,24 +86,33 @@ pub fn pairwise_dist(
 //         .collect()
 // }
 
-pub fn boundary_electro<T: Closest>(
-    a: &T,
+pub fn boundary_electro(
+    a: &Agent,
+    agent_radius: f64,
     boundaries: &BoundaryConfig,
     electro_coeff: f64,
-) -> Vector3<f64> {
-    boundaries.closed_boundary_overlaps(a).iter().fold(
-        Vector3::zeros(),
-        |f_tot, (normal, overlap)| {
-            let f = electro_kinematics(*normal, *overlap, electro_coeff);
-            if *overlap > 0.0 {
-                debug!(
-                    "normal: {}, overlap: {}, f={}",
-                    normal.into_inner(),
-                    1e6 * overlap,
-                    1e12 * f
+) -> (Vector3<f64>, Vector3<f64>) {
+    boundaries
+        .agent_closest_points_on_boundaries(a)
+        .iter()
+        .fold(
+            (Vector3::zeros(), Vector3::zeros()),
+            |(f_tot, torque_tot), (closest_point_segment, closest_point_bound)| {
+                let bound_to_seg = closest_point_bound - closest_point_segment;
+                let normal = UnitVector3::new_normalize(-bound_to_seg);
+                let overlap = agent_radius - bound_to_seg.magnitude();
+
+                let f = electro_kinematics(normal, overlap, electro_coeff);
+
+                let (f, torque) = agent_x_electro(
+                    f,
+                    *closest_point_segment,
+                    UnitVector3::new_normalize(bound_to_seg),
+                    agent_radius,
+                    a,
                 );
-            }
-            f_tot + f
-        },
-    )
+
+                (f_tot + f, torque_tot + torque)
+            },
+        )
 }

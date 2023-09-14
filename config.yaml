@@ -14,20 +14,20 @@ parameters:
     #     type: Rotlet
     #     c: [0.0, 1.0e-24, 0.0]
   object_stiffness: 1e1
-  fluid_temperature: 0.0
+  fluid_temperature: 300.0
   fluid_viscosity: 0.001
   agent_radius: 0.5e-6
   agent_length: 4.0e-6
   agent_linear_spring_stiffness: 1.0e-6
   agent_propulsion_force: 0.5e-12
 agent_initialization:
-  # - type: RandomUniformByNumber
-  #   number: 10
-  - type: Explicit
-    agents:
-      - r: [-9.0e-6, +0.01e-6, +0.0e-6]
-        u: [+1.0   , +0.0   , +0.0   ]
-      - r: [+9.0e-6, +0.0e-6, +0.0e-6]
-        u: [-1.0   , +0.0   , +0.0   ]
+  - type: RandomUniformByNumber
+    number: 100
+  # - type: Explicit
+  #   agents:
+  #     - r: [-9.0e-6, +0.01e-6, +0.0e-6]
+  #       u: [+1.0   , +0.0   , +0.0   ]
+  #     - r: [+9.0e-6, +0.0e-6, +0.0e-6]
+  #       u: [-1.0   , +0.0   , +0.0   ]
   # - type: RandomUniformByVolumeNumberDensity
   #   volume_number_density: 0.01e17

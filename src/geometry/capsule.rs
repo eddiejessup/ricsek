@@ -1,6 +1,9 @@
 use nalgebra::{Point3, Unit, UnitVector3, Vector3};
 
-use super::{closest::Closest, line_segment::{LineSegment, BoundingBox}};
+use super::{
+    closest::Closest,
+    line_segment::{BoundingBox, LineSegment},
+};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Capsule {
@@ -52,13 +55,12 @@ impl Capsule {
     }
 }
 
-
 pub fn capsule_bounding_box(segment: &LineSegment, radius: f64) -> BoundingBox {
-  let bb = segment.bounding_box();
-  BoundingBox {
-      min: bb.min.coords.add_scalar(-radius).into(),
-      max: bb.max.coords.add_scalar(radius).into(),
-  }
+    let bb = segment.bounding_box();
+    BoundingBox {
+        min: bb.min.coords.add_scalar(-radius).into(),
+        max: bb.max.coords.add_scalar(radius).into(),
+    }
 }
 
 impl Closest for Capsule {

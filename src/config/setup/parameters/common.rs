@@ -1,7 +1,6 @@
-use log::debug;
 use nalgebra::{Point3, UnitVector3, Vector3};
 
-use crate::geometry::closest::Closest;
+use crate::{geometry::closest::Closest, state::Agent};
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct AxisBoundaryConfig {
@@ -34,33 +33,27 @@ impl BoundaryConfig {
         r_b
     }
 
-    fn closed_boundary_overlaps_helper<T: Closest>(
+    fn agent_closest_points_on_boundary(
         &self,
-        a: &T,
+        a: &Agent,
         i: usize,
         positive: bool,
-    ) -> (UnitVector3<f64>, f64) {
+    ) -> (Point3<f64>, Point3<f64>) {
         let normal = UnitVector3::new_unchecked(Vector3::ith(i, if positive { -1.0 } else { 1.0 }));
-        let subject_point = a.furthest_point_along_axis(i, positive);
+        let subject_point = a.seg.furthest_point_along_axis(i, positive);
         let boundary_point = self.closest_point_on_boundary(subject_point, i, positive);
-        let is_outside = subject_point[i].abs() > boundary_point[i].abs();
-        let overlap = (subject_point - boundary_point).norm() * if is_outside { 1.0 } else { -1.0 };
-        if is_outside {
-          debug!("Along axis {}, positive? {}, subject centre at {}, subject extremum at {}, relevant boundary point {}, overlap {}", i, positive, 1e6*a.centroid(), 1e6*subject_point, 1e6*boundary_point, overlap);
-
-        }
-        (normal, overlap)
+        (subject_point, boundary_point)
     }
 
-    pub fn closed_boundary_overlaps<T: Closest>(&self, a: &T) -> Vec<(UnitVector3<f64>, f64)> {
+    pub fn agent_closest_points_on_boundaries(&self, a: &Agent) -> Vec<(Point3<f64>, Point3<f64>)> {
         self.0
             .iter()
             .enumerate()
             .flat_map(|(i, b)| {
                 if b.closed {
                     vec![
-                        self.closed_boundary_overlaps_helper(a, i, true),
-                        self.closed_boundary_overlaps_helper(a, i, false),
+                        self.agent_closest_points_on_boundary(a, i, true),
+                        self.agent_closest_points_on_boundary(a, i, false),
                     ]
                 } else {
                     vec![]

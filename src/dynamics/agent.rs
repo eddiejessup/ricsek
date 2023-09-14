@@ -1,9 +1,25 @@
-use log::debug;
-use nalgebra::{zero, UnitVector3, Vector3};
+use nalgebra::{zero, UnitVector3, Vector3, Point3};
 
 use crate::state::Agent;
 
 use super::electro::electro_kinematics;
+
+pub fn agent_x_electro(
+  f: Vector3<f64>,
+  closest_seg_point: Point3<f64>,
+  u_seg_to_obj: UnitVector3<f64>,
+  agent_radius: f64,
+  a: &Agent,
+) -> (Vector3<f64>, Vector3<f64>) {
+  // The force is applied at the closest-point on the segment, plus the radius
+  // of the agent in the direction of the repulsing object.
+  let force_point = closest_seg_point + u_seg_to_obj.scale(agent_radius);
+  let moment_arm = force_point - a.seg.centroid();
+  let torque = moment_arm.cross(&f);
+
+  (f, torque)
+}
+
 
 pub fn agent_agent_electro(
     a1: &Agent,
@@ -26,22 +42,13 @@ pub fn agent_agent_electro(
         electro_coeff,
     );
 
-    debug!(
-        "ELECTRO a1s={} a1e={} a2s={} a2e={} a1p={} a2p={} r1c_r2c={} f={}",
-        1e6 * a1.seg.start.x,
-        1e6 * a1.seg.end.x,
-        1e6 * a2.seg.start.x,
-        1e6 * a2.seg.end.x,
-        1e6 * a1p.x,
-        1e6 * a2p.x,
-        1e6 * r1c_r2c.x,
-        1e12 * f.x,
-    );
-
-    let r1com_to_r1f = a1p - a1.seg.centroid();
-
-    let torque = r1com_to_r1f.cross(&f);
-    (f, torque)
+    agent_x_electro(
+      f,
+      a1p,
+      UnitVector3::new_normalize(r1c_r2c),
+      agent_radius,
+      a1,
+    )
 }
 
 // Super naive implementation.

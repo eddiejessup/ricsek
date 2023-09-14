@@ -13,6 +13,7 @@ pub struct AgentStepSummary {
     pub f_agent_hydro: Vector3<f64>,
     pub f_propulsion: Vector3<f64>,
     pub f_boundary_electro: Vector3<f64>,
+    pub torque_boundary_electro: Vector3<f64>,
     pub f_singularity: Vector3<f64>,
 }
 
@@ -43,7 +44,7 @@ pub struct Agent {
 
 impl Agent {
     pub fn new(r: Point3<f64>, d: Vector3<f64>) -> Self {
-      debug!("Agent::new(r={}, d={})", 1e6*r, 1e6*d);
+        debug!("Agent::new(r={}, d={})", 1e6 * r, 1e6 * d);
         Agent {
             seg: LineSegment::new(r, d),
             th1: 0.0,

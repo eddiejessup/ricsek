@@ -131,7 +131,7 @@ fn update_agent_points(
             let agent_summary = &agent_summaries[agent_id.0];
             *vector_set = flow::VectorSet(vec![
                 (
-                    flow::VectorLabel("agent_electro".to_string()),
+                    flow::VectorLabel("f_agent_electro".to_string()),
                     agent_summary.f_agent_electro,
                 ),
                 (
@@ -139,19 +139,23 @@ fn update_agent_points(
                     1e6 * agent_summary.torque_agent_electro,
                 ),
                 (
-                    flow::VectorLabel("agent_hydro".to_string()),
+                    flow::VectorLabel("f_agent_hydro".to_string()),
                     agent_summary.f_agent_hydro,
                 ),
                 (
-                    flow::VectorLabel("propulsion".to_string()),
+                    flow::VectorLabel("f_propulsion".to_string()),
                     agent_summary.f_propulsion,
                 ),
                 (
-                    flow::VectorLabel("boundary_electro".to_string()),
+                    flow::VectorLabel("f_boundary_electro".to_string()),
                     agent_summary.f_boundary_electro,
                 ),
                 (
-                    flow::VectorLabel("singularity".to_string()),
+                    flow::VectorLabel("torque_boundary_electro".to_string()),
+                    1e6 * agent_summary.torque_boundary_electro,
+                ),
+                (
+                    flow::VectorLabel("f_singularity".to_string()),
                     agent_summary.f_singularity,
                 ),
             ])

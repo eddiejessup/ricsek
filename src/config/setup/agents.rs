@@ -50,7 +50,7 @@ pub fn random_uniform_positions(
 }
 
 fn random_uniform_agents(rng: &mut ThreadRng, n: usize, l: Vector3<f64>, d: f64) -> Vec<state::Agent> {
-    let rs = random_uniform_positions(rng, n, l);
+    let rs = random_uniform_positions(rng, n, l.add_scalar(-2.0 * d));
     let us = random_uniform_orientations(rng, n);
     (0..n).map(|i| Agent::new(rs[i], us[i].scale(d))).collect()
 }
