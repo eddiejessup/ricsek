@@ -103,7 +103,8 @@ fn stokeslet_mirror(
 }
 
 fn main() {
-    let env = environment::Environment {
+  env_logger::init();
+  let env = environment::Environment {
         boundaries: BoundaryConfig(Vector3::new(
             AxisBoundaryConfig {
                 l: 200.0e-6,
@@ -276,5 +277,5 @@ fn main() {
         )
         .run();
 
-    println!("Done!");
+    info!("Done!");
 }

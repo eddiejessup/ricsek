@@ -10,7 +10,7 @@ use rand::rngs::ThreadRng;
 pub enum AgentInitializationConfig {
     RandomUniformByVolumeNumberDensity(AgentVolumeNumberDensityConfig),
     RandomUniformByNumber(AgentNumberConfig),
-    Explicit(ExplicitAgentConfig),
+    Explicit(ExplicitAgentsConfig),
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -24,8 +24,14 @@ pub struct AgentNumberConfig {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct ExplicitAgentsConfig {
+    pub agents: Vec<ExplicitAgentConfig>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct ExplicitAgentConfig {
-    pub agents: Vec<Agent>,
+    r: Point3<f64>,
+    u: UnitVector3<f64>,
 }
 
 pub fn random_uniform_orientations(rng: &mut ThreadRng, n: usize) -> Vec<UnitVector3<f64>> {
@@ -67,6 +73,8 @@ pub fn initialize_agents(
         AgentInitializationConfig::RandomUniformByNumber(AgentNumberConfig { number }) => {
             random_uniform_agents(rng, number, l, d)
         }
-        AgentInitializationConfig::Explicit(ExplicitAgentConfig { agents }) => agents,
+        AgentInitializationConfig::Explicit(ExplicitAgentsConfig { agents }) => agents.iter().map(
+            |ExplicitAgentConfig { r, u }| Agent::new(*r, u.scale(d)),
+        ).collect(),
     }
 }

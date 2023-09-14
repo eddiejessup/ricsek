@@ -1,3 +1,4 @@
+use log::{info, warn};
 use ricsek::{config::run::RunConfig, dynamics::run};
 
 use structopt::StructOpt;
@@ -16,6 +17,7 @@ pub struct RunCli {
 }
 
 fn main() {
+    env_logger::init();
     let args = RunCli::from_args();
 
     let conn = &mut ricsek::db::establish_connection();
@@ -23,11 +25,11 @@ fn main() {
     let run_id = match args.run_id {
         Some(run_id) => run_id,
         None => {
-            println!("No run_id specified, using latest run_id");
+            warn!("No run_id specified, using latest run_id");
             ricsek::db::read_latest_run_id(conn)
         }
     };
-    println!("Running run_id: {}", run_id);
+    info!("Running run_id: {}", run_id);
 
     let setup = ricsek::db::read_run(conn, run_id);
 
@@ -38,13 +40,8 @@ fn main() {
     };
 
     let sim_state = ricsek::db::read_latest_checkpoint(conn, run_id);
-    println!("Running from step {}, t={}s", sim_state.step, sim_state.t);
+    info!("Running from step {}, t={}s", sim_state.step, sim_state.t);
 
-    run(
-        conn,
-        setup.parameters,
-        sim_state,
-        run_config,
-    );
-    println!("Done!");
+    run(conn, setup.parameters, sim_state, run_config);
+    info!("Done!");
 }

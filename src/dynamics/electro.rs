@@ -9,7 +9,7 @@ pub fn electro_kinematics(
   // Otherwise, there is no force.
   if overlap > 0.0 {
       // Force acts along repulsor normal.
-      repulser_normal.into_inner() * electro_coeff * overlap.powi(3).sqrt()
+      repulser_normal.scale(electro_coeff * overlap.powi(3).sqrt())
     } else {
       zero()
   }

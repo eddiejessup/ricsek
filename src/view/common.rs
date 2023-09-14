@@ -51,6 +51,8 @@ pub fn spawn_arrow(
         PbrBundle {
             mesh: cone.clone(),
             material: material.clone(),
+            // The cone's origin is at its base, so translate it up so the base
+            // sits at the end of the cylinder.
             transform: transform_mesh.with_translation(-Vec3::Z * cylinder_height),
             ..default()
         },
@@ -60,6 +62,8 @@ pub fn spawn_arrow(
         PbrBundle {
             mesh: cylinder.clone(),
             material: material.clone(),
+            // The cylinder's origin is at its centre, so translate it forward
+            // by half its length to make its origin be its base.
             transform: transform_mesh.with_translation(-Vec3::Z * cylinder_height / 2.0),
             ..default()
         },
@@ -82,7 +86,7 @@ pub fn add_axis_arrows(
             .spawn(SpatialBundle::from_transform(
                 Transform::default()
                     .looking_to(ax, Vec3::Y)
-                    .with_scale(Vec3::splat(10.0)),
+                    .with_scale(Vec3::splat(1.0)),
             ))
             .with_children(|parent| {
                 spawn_arrow(

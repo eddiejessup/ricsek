@@ -12,11 +12,6 @@ pub const TIME_STEP: f64 = 1.0 / 160.0;
 #[derive(Component)]
 pub struct AgentId(pub usize);
 
-#[derive(Component)]
-pub struct AgentBody {
-    pub back: bool,
-}
-
 #[derive(Resource)]
 pub struct ViewState {
     pub i: usize,
@@ -53,7 +48,7 @@ pub fn cursor_system(
 
     let camera_loc = camera_transform.translation();
 
-    eprintln!(
+    debug!(
         "Camera loc: {}/{}/{}",
         camera_loc.x, camera_loc.y, camera_loc.z
     );
@@ -65,11 +60,11 @@ pub fn cursor_system(
         .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
         .map(|ray| ray.origin)
     {
-        eprintln!(
+        debug!(
             "Pixel coords: {}/{}/{}",
             world_position.x, world_position.y, world_position.z
         );
-        eprintln!(
+        debug!(
             "Sim coords: {}/{}/{}",
             world_position.x, world_position.y, world_position.z
         );

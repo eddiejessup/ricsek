@@ -31,6 +31,10 @@ impl Sphere {
 }
 
 impl Closest for Sphere {
+    fn centroid(&self) -> Point3<f64> {
+        self.point
+    }
+
     fn furthest_point_along_axis(&self, i: usize, positive: bool) -> Point3<f64> {
         self.point + Vector3::ith(i, self.radius * if positive { 1.0 } else { -1.0 })
     }

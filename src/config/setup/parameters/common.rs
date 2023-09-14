@@ -1,3 +1,4 @@
+use log::debug;
 use nalgebra::{Point3, UnitVector3, Vector3};
 
 use crate::geometry::closest::Closest;
@@ -35,7 +36,7 @@ impl BoundaryConfig {
 
     fn closed_boundary_overlaps_helper<T: Closest>(
         &self,
-        a: &T, // anything that implements Closest
+        a: &T,
         i: usize,
         positive: bool,
     ) -> (UnitVector3<f64>, f64) {
@@ -44,6 +45,10 @@ impl BoundaryConfig {
         let boundary_point = self.closest_point_on_boundary(subject_point, i, positive);
         let is_outside = subject_point[i].abs() > boundary_point[i].abs();
         let overlap = (subject_point - boundary_point).norm() * if is_outside { 1.0 } else { -1.0 };
+        if is_outside {
+          debug!("Along axis {}, positive? {}, subject centre at {}, subject extremum at {}, relevant boundary point {}, overlap {}", i, positive, 1e6*a.centroid(), 1e6*subject_point, 1e6*boundary_point, overlap);
+
+        }
         (normal, overlap)
     }
 

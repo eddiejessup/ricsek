@@ -1,6 +1,6 @@
 use nalgebra::{Point3, Unit, UnitVector3, Vector3};
 
-use super::{closest::Closest, line_segment::LineSegment};
+use super::{closest::Closest, line_segment::{LineSegment, BoundingBox}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Capsule {
@@ -46,9 +46,26 @@ impl Capsule {
 
         (s, to_surface_vec, dist_to_surface, p_c_u)
     }
+
+    pub fn bounding_box(&self) -> BoundingBox {
+        capsule_bounding_box(&self.segment, self.radius)
+    }
+}
+
+
+pub fn capsule_bounding_box(segment: &LineSegment, radius: f64) -> BoundingBox {
+  let bb = segment.bounding_box();
+  BoundingBox {
+      min: bb.min.coords.add_scalar(-radius).into(),
+      max: bb.max.coords.add_scalar(radius).into(),
+  }
 }
 
 impl Closest for Capsule {
+    fn centroid(&self) -> Point3<f64> {
+        self.segment.centroid()
+    }
+
     fn furthest_point_along_axis(&self, i: usize, positive: bool) -> Point3<f64> {
         self.segment.furthest_point_along_axis(i, positive)
             + Vector3::ith(i, self.radius * if positive { 1.0 } else { -1.0 })

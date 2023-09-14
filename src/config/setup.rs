@@ -3,6 +3,8 @@ pub mod parameters;
 
 use std::{error::Error, fs::File, io::Read, path::Path};
 
+use log::info;
+
 use self::{agents::AgentInitializationConfig, parameters::simulation::SimParams};
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -34,7 +36,7 @@ impl SetupConfig {
     }
 
     pub fn print(&self) {
-        println!(
+        info!(
             "\
 Simulation parameters:
   Environment:
@@ -42,7 +44,7 @@ Simulation parameters:
     System length (µm): {l}
 
   Agents:
-    Effective radius: {ag_radius} µm
+    Radius: {ag_radius} µm
     Translational mobility: {ag_mobility:.1} (µm/s)/pN
     Translational diffusion rate: {d_trans_diff:.1} µm^2/s
     Rotational diffusion rate: {d_rot_diff:.1} rad^2/s
@@ -58,7 +60,7 @@ Simulation parameters:
             d_rot_diff = self.parameters.agent_rotational_diffusion_coefficient,
             ag_v_propulse = 1e6 * self.parameters.agent_propulsion_speed(),
             ag_radius = 1e6 * self.parameters.agent_radius,
-            ag_mobility = 1e6 * self.parameters.agent_mobility / 1e12,
+            ag_mobility = 1e6 * self.parameters.agent_translational_mobility / 1e12,
             t_rot_diff = std::f64::consts::PI * std::f64::consts::PI
                 / (4.0 * self.parameters.agent_rotational_diffusion_coefficient),
             t_cross = self.parameters.boundaries.l() / self.parameters.agent_propulsion_speed(),

@@ -9,7 +9,7 @@ use bevy::{
 };
 use nalgebra::Point3;
 use ricsek::view::{
-    common::nalgebra_to_glam_vec,
+    common::{add_axis_arrows, nalgebra_to_glam_vec},
     environment::Environment,
     flow::FlowViewState,
     pan_orbit_camera::{add_camera, pan_orbit_camera_update},
@@ -18,10 +18,11 @@ use ricsek::view::{
 use structopt::StructOpt;
 
 #[derive(Component)]
-pub struct AgentBackEnd;
-
-#[derive(Component)]
-pub struct AgentFrontEnd;
+pub enum AgentBodyComponent {
+    Back,
+    Front,
+    Rod,
+}
 
 pub fn add_agents(
     mut commands: Commands,
@@ -41,6 +42,7 @@ pub fn add_agents(
 
     let back_material = materials.add(StandardMaterial::from(Color::GREEN.with_a(0.9)));
     let front_material = materials.add(StandardMaterial::from(Color::RED.with_a(0.9)));
+    let rod_material = materials.add(StandardMaterial::from(Color::BLACK.with_a(0.9)));
 
     let sphere_mesh = meshes.add(
         shape::UVSphere {
@@ -50,7 +52,15 @@ pub fn add_agents(
         }
         .into(),
     );
-    let transform_mesh = Transform::from_rotation(Quat::from_rotation_x(-FRAC_PI_2));
+    let rod_mesh = meshes.add(
+        shape::Cylinder {
+            radius: env.transform_coord(0.1e-6),
+            height: env.transform_coord(config.parameters.agent_inter_sphere_length),
+            resolution: 18,
+            segments: 1,
+        }
+        .into(),
+    );
 
     cur_sim_state.agents.iter().enumerate().for_each(|(i, _a)| {
         commands
@@ -61,27 +71,39 @@ pub fn add_agents(
                 AgentId(i),
                 flow::VectorSet(vec![]),
             ))
-            .with_children(|point_parent| {
-                point_parent.spawn((
+            .with_children(|parent| {
+                parent.spawn((
                     PbrBundle {
                         mesh: sphere_mesh.clone(),
                         material: back_material.clone(),
-                        transform: transform_mesh,
                         ..default()
                     },
                     AgentId(i),
-                    AgentBody { back: true },
+                    AgentBodyComponent::Back,
                 ));
-                point_parent.spawn((
+                parent.spawn((
                     PbrBundle {
                         mesh: sphere_mesh.clone(),
                         material: front_material.clone(),
-                        transform: transform_mesh,
                         ..default()
                     },
                     AgentId(i),
-                    AgentBody { back: false },
+                    AgentBodyComponent::Front,
                 ));
+                parent
+                    .spawn((
+                        SpatialBundle::default(),
+                        AgentId(i),
+                        AgentBodyComponent::Rod,
+                    ))
+                    .with_children(|rod_parent| {
+                        rod_parent.spawn((PbrBundle {
+                            mesh: rod_mesh.clone(),
+                            material: rod_material.clone(),
+                            transform: Transform::from_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
+                            ..default()
+                        },));
+                    });
             });
     });
 }
@@ -95,12 +117,12 @@ fn update_agent_points(
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
     let opt_summary = &cur_sim_state.summary;
-    // match opt_summary {
-    //     None => println!("No agent summary for view_i: {}", view_i),
-    //     Some(_) => println!("Agent summary for view_i: {}", view_i),
-    // };
+    match opt_summary {
+        None => debug!("No agent summary for view_i: {}", view_i),
+        Some(_) => debug!("Agent summary for view_i: {}", view_i),
+    };
 
-    // println!("Updating positions for agents, to view_i: {}", view_i);
+    debug!("Updating positions for agents, to view_i: {}", view_i);
     for (agent_id, mut vector_set, mut transform) in &mut q_point {
         let agent = &cur_sim_state.agents[agent_id.0];
         *transform = Transform::from_translation(env.transformed_vec3(agent.seg.centroid()));
@@ -111,6 +133,10 @@ fn update_agent_points(
                 (
                     flow::VectorLabel("agent_electro".to_string()),
                     agent_summary.f_agent_electro,
+                ),
+                (
+                    flow::VectorLabel("torque_agent_electro".to_string()),
+                    1e6 * agent_summary.torque_agent_electro,
                 ),
                 (
                     flow::VectorLabel("agent_hydro".to_string()),
@@ -137,18 +163,25 @@ fn update_agent_orientations(
     env: Res<Environment>,
     sim_states: Res<SimStates>,
     view_state: Res<ViewState>,
-    mut q_ag: Query<(&AgentId, &mut Transform, &AgentBody)>,
+    mut q_ag: Query<(&AgentId, &mut Transform, &AgentBodyComponent)>,
 ) {
     let view_i = view_state.i;
     let cur_sim_state = &sim_states.0[view_i];
-    // println!("Updating orientations for agents, to view_i: {}", view_i);
+    debug!("Updating orientations for agents, to view_i: {}", view_i);
     for (agent_id, mut transform, agent_body) in &mut q_ag {
         let agent = &cur_sim_state.agents[agent_id.0];
-        *transform = Transform::from_translation(env.transformed_vec3(
-            Point3::origin()
-                + agent.seg.start_end() * 0.5 * (if agent_body.back { -1.0 } else { 1.0 }),
-        ))
-        .looking_to(nalgebra_to_glam_vec(&agent.u()), Vec3::Z);
+        *transform = match agent_body {
+            AgentBodyComponent::Front => Transform::from_translation(
+                env.transformed_vec3(Point3::origin() + agent.seg.start_end() * 0.5),
+            )
+            .looking_to(nalgebra_to_glam_vec(&agent.seg.start_end()), Vec3::Z),
+            AgentBodyComponent::Back => Transform::from_translation(
+                env.transformed_vec3(Point3::origin() - agent.seg.start_end() * 0.5),
+            )
+            .looking_to(nalgebra_to_glam_vec(&agent.seg.start_end()), Vec3::Z),
+            AgentBodyComponent::Rod => Transform::IDENTITY
+                .looking_to(nalgebra_to_glam_vec(&agent.seg.start_end()), Vec3::Z),
+        }
     }
 }
 
@@ -204,6 +237,7 @@ pub struct ViewCli {
 }
 
 fn main() {
+    env_logger::init();
     let args = ViewCli::from_args();
 
     let conn = &mut ricsek::db::establish_connection();
@@ -211,7 +245,7 @@ fn main() {
     let run_id = match args.run_id {
         Some(run_id) => run_id,
         None => {
-            println!("No run_id specified, using latest run_id");
+            warn!("No run_id specified, using latest run_id");
             ricsek::db::read_latest_run_id(conn)
         }
     };
@@ -225,7 +259,7 @@ fn main() {
         length_factor: 1e6,
     };
 
-    println!("Got {} sim-states", sim_states.len());
+    info!("Got {} sim-states", sim_states.len());
 
     App::new()
         .add_plugins((
@@ -247,6 +281,7 @@ fn main() {
         .insert_resource(FlowViewState::new(10000))
         .insert_resource(ViewState::default())
         .add_systems(Startup, add_camera)
+        // .add_systems(Startup, add_axis_arrows)
         .add_systems(Startup, add_agents)
         .add_systems(Startup, environment::add_environment)
         .add_systems(PostStartup, flow::add_flow)
@@ -269,5 +304,5 @@ fn main() {
         .add_systems(Update, bevy::window::close_on_esc)
         .run();
 
-    println!("Done!");
+    info!("Done!");
 }

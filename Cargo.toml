@@ -32,6 +32,8 @@ clap = { version = "4.1", features = [
 colorgrad = "0.6"
 structopt = "0.3"
 bevy_more_shapes = { git = "https://github.com/eddiejessup/bevy_more_shapes.git", branch = "bevy_0.11.0" }
+env_logger = "0.10"
+log = "0.4"
 
 [[bin]]
 name = "initialize"
