@@ -1,7 +1,8 @@
-use nalgebra::{Point3, UnitVector3, Vector3};
+use nalgebra::{Point3, Vector3};
 
 use crate::{
     config::setup::parameters::common::{AxisBoundaryConfig, BoundaryConfig},
+    geometry::reverse_unit_vector,
     state::Agent,
 };
 
@@ -97,17 +98,14 @@ pub fn boundary_electro(
         .iter()
         .fold(
             (Vector3::zeros(), Vector3::zeros()),
-            |(f_tot, torque_tot), (closest_point_segment, closest_point_bound)| {
-                let bound_to_seg = closest_point_bound - closest_point_segment;
-                let normal = UnitVector3::new_normalize(-bound_to_seg);
-                let overlap = agent_radius - bound_to_seg.magnitude();
-
-                let f = electro_kinematics(normal, overlap, electro_coeff);
+            |(f_tot, torque_tot), (closest_point_segment, normal, seg_overlap)| {
+                let overlap = agent_radius + seg_overlap;
+                let f = electro_kinematics(*normal, overlap, electro_coeff);
 
                 let (f, torque) = agent_x_electro(
                     f,
                     *closest_point_segment,
-                    UnitVector3::new_normalize(bound_to_seg),
+                    reverse_unit_vector(normal),
                     agent_radius,
                     a,
                 );

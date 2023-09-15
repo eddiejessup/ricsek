@@ -1,25 +1,24 @@
-use nalgebra::{zero, UnitVector3, Vector3, Point3};
+use nalgebra::{zero, Point3, UnitVector3, Vector3};
 
 use crate::state::Agent;
 
-use super::electro::electro_kinematics;
+use super::{electro::electro_kinematics, stokes_solutions::stokeslet_u};
 
 pub fn agent_x_electro(
-  f: Vector3<f64>,
-  closest_seg_point: Point3<f64>,
-  u_seg_to_obj: UnitVector3<f64>,
-  agent_radius: f64,
-  a: &Agent,
+    f: Vector3<f64>,
+    closest_seg_point: Point3<f64>,
+    u_seg_to_obj: UnitVector3<f64>,
+    agent_radius: f64,
+    a: &Agent,
 ) -> (Vector3<f64>, Vector3<f64>) {
-  // The force is applied at the closest-point on the segment, plus the radius
-  // of the agent in the direction of the repulsing object.
-  let force_point = closest_seg_point + u_seg_to_obj.scale(agent_radius);
-  let moment_arm = force_point - a.seg.centroid();
-  let torque = moment_arm.cross(&f);
+    // The force is applied at the closest-point on the segment, plus the radius
+    // of the agent in the direction of the repulsing object.
+    let force_point = closest_seg_point + u_seg_to_obj.scale(agent_radius);
+    let moment_arm = force_point - a.seg.centroid();
+    let torque = moment_arm.cross(&f);
 
-  (f, torque)
+    (f, torque)
 }
-
 
 pub fn agent_agent_electro(
     a1: &Agent,
@@ -43,11 +42,11 @@ pub fn agent_agent_electro(
     );
 
     agent_x_electro(
-      f,
-      a1p,
-      UnitVector3::new_normalize(r1c_r2c),
-      agent_radius,
-      a1,
+        f,
+        a1p,
+        UnitVector3::new_normalize(r1c_r2c),
+        agent_radius,
+        a1,
     )
 }
 
@@ -55,11 +54,11 @@ pub fn agent_agent_electro(
 pub fn agent_agents_electro(
     a1: &Agent,
     i1: usize,
-    ags: &[Agent],
+    agents: &[Agent],
     agent_radius: f64,
     electro_coeff: f64,
 ) -> (Vector3<f64>, Vector3<f64>) {
-    ags.iter()
+    agents.iter()
         .enumerate()
         .fold((zero(), zero()), |(f_tot, torque_tot), (i2, a2)| {
             if i1 == i2 {
@@ -69,4 +68,28 @@ pub fn agent_agents_electro(
                 (f_tot + f, torque_tot + torque)
             }
         })
+}
+
+// Super naive implementation.
+pub fn agent_fluid_v(a: &Agent, f0: f64, r: Point3<f64>) -> Vector3<f64> {
+    let u = a.u();
+    stokeslet_u(u.scale(-f0), r - a.seg.start) + stokeslet_u(u.scale(f0), r - a.seg.end)
+}
+
+pub fn agents_fluid_v(
+  r1: Point3<f64>,
+  i1: usize,
+  agents: &[Agent],
+  f0: f64,
+) -> Vector3<f64> {
+  agents.iter()
+      .enumerate()
+      .fold(zero(), |v_tot, (i2, a2)| {
+          if i1 == i2 {
+              v_tot
+          } else {
+              let v = agent_fluid_v(a2, f0, r1);
+              v_tot + v
+          }
+      })
 }

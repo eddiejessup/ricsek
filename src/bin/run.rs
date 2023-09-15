@@ -42,6 +42,6 @@ fn main() {
     let sim_state = ricsek::db::read_latest_checkpoint(conn, run_id);
     info!("Running from step {}, t={}s", sim_state.step, sim_state.t);
 
-    run(conn, setup.parameters, sim_state, run_config);
+    run(conn, setup.parameters, sim_state, run_config).unwrap();
     info!("Done!");
 }

@@ -12,11 +12,19 @@ use crate::dynamics::agent::agent_agents_electro;
 use crate::dynamics::brownian::{rot_brownian_distr, trans_brownian_distr};
 use crate::geometry::point::random_vector;
 use crate::state::*;
+use diesel::result::Error;
 use log::{debug, info};
 use nalgebra::{Point3, Rotation3, UnitVector3, Vector3};
 use rand_distr::{Normal, Uniform};
 
-pub fn fluid_v_at(sim_params: &SimParams, r: Point3<f64>) -> Vector3<f64> {
+use self::agent::agents_fluid_v;
+
+pub fn fluid_v_at(
+    sim_params: &SimParams,
+    r: Point3<f64>,
+    i_agent: usize,
+    agents: &[Agent],
+) -> Vector3<f64> {
     // Singularity contribution to flow.
     let v_fluid_singularity = sim_params
         .singularities
@@ -24,18 +32,23 @@ pub fn fluid_v_at(sim_params: &SimParams, r: Point3<f64>) -> Vector3<f64> {
         .map(|singularity| singularity.eval(r))
         .sum::<Vector3<f64>>();
     // Other-agent contribution to flow.
-    let v_fluid_agents = Vector3::zeros();
+    let v_fluid_agents = agents_fluid_v(r, i_agent, agents, sim_params.agent_propulsion_force);
     v_fluid_singularity + v_fluid_agents
 }
 
-pub fn force_balance_v(sim_params: &SimParams, r: &mut Point3<f64>, f: Vector3<f64>) {
-    let v = fluid_v_at(sim_params, *r) + f * sim_params.agent_translational_mobility;
-    debug!("Non-fluid force: {}", 1e12 * f);
-    debug!("Body part velocity: {}", 1e6 * v);
-    // Update agent position from velocity.
-    let dr = v * sim_params.dt;
-    debug!("Body part displacement: {}", 1e6 * dr);
-    *r += dr;
+pub fn force_balance_v(
+    sim_params: &SimParams,
+    r: &mut Point3<f64>,
+    i_agent: usize,
+    agents: &[Agent],
+    f: Vector3<f64>,
+) -> Vector3<f64> {
+    let v_fluid = fluid_v_at(sim_params, *r, i_agent, agents);
+    let v_object = v_fluid + f * sim_params.agent_translational_mobility;
+    // Update agent part position from velocity.
+    let dr_object = v_object * sim_params.dt;
+    *r += dr_object;
+    v_fluid
 }
 
 pub fn update(
@@ -51,7 +64,7 @@ pub fn update(
     let agents = sim_state.agents.clone();
 
     let mut agent_summaries: Vec<AgentStepSummary> = vec![];
-    for (i, mut agent) in sim_state.agents.iter_mut().enumerate() {
+    for (i_agent, mut agent) in sim_state.agents.iter_mut().enumerate() {
         // Fluid velocity and rotation.
 
         // Agent propulsion.
@@ -65,7 +78,7 @@ pub fn update(
         // Agent-agent electrostatic repulsion.
         let (f_agent_electro, torque_agent_electro) = agent_agents_electro(
             agent,
-            i,
+            i_agent,
             &agents,
             sim_params.agent_radius,
             sim_params.agent_object_hertz_force_coefficient,
@@ -79,15 +92,19 @@ pub fn update(
         );
 
         debug!("Doing force balance calculation for back end");
-        force_balance_v(
+        let v_fluid_back = force_balance_v(
             sim_params,
             &mut agent.seg.start,
+            i_agent,
+            &agents,
             f1_propulsion + f1_spring + f_agent_electro + f_boundary_electro,
         );
         debug!("Doing force balance calculation for front end");
-        force_balance_v(
+        let v_fluid_front = force_balance_v(
             sim_params,
             &mut agent.seg.end,
+            i_agent,
+            &agents,
             -f1_spring + f_agent_electro + f_boundary_electro,
         );
 
@@ -115,11 +132,11 @@ pub fn update(
         agent_summaries.push(AgentStepSummary {
             f_agent_electro,
             torque_agent_electro,
-            f_agent_hydro: Vector3::zeros(),
             f_propulsion: f1_propulsion,
             torque_boundary_electro,
             f_boundary_electro,
-            f_singularity: Vector3::zeros(),
+            v_fluid_back,
+            v_fluid_front,
         });
     }
 
@@ -135,7 +152,7 @@ pub fn run(
     sim_params: SimParams,
     mut sim_state: SimState,
     run_params: RunConfig,
-) {
+) -> Result<(), Error> {
     let trans_diff_distr = trans_brownian_distr(
         sim_params.agent_translational_diffusion_coefficient,
         sim_params.dt,
@@ -158,7 +175,8 @@ pub fn run(
 
         if sim_state.step % run_params.dstep_view == 0 {
             info!("CHECKPOINT: step={}, t = {}", sim_state.step, sim_state.t);
-            crate::db::write_checkpoint(conn, run_params.run_id, &sim_state, Some(summaries));
+            crate::db::write_checkpoint(conn, run_params.run_id, &sim_state, Some(summaries))?;
         }
     }
+    Ok(())
 }

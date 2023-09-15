@@ -9,7 +9,7 @@ fn main() {
     let sim_params = &config.parameters;
 
     let mut rng = rand::thread_rng();
-    warn!("{}", 1e6*sim_params.agent_inter_sphere_length);
+    warn!("{}", 1e6 * sim_params.agent_inter_sphere_length);
     let agents: Vec<Agent> = config
         .agent_initialization
         .iter()
@@ -29,6 +29,6 @@ fn main() {
     let connection = &mut ricsek::db::establish_connection();
 
     let run_id = ricsek::db::initialize_run(connection, &config);
-    ricsek::db::write_checkpoint(connection, run_id, &sim_state, None);
+    ricsek::db::write_checkpoint(connection, run_id, &sim_state, None).unwrap();
     info!("Initialized run ID {}", run_id);
 }

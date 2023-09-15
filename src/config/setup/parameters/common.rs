@@ -1,4 +1,4 @@
-use nalgebra::{Point3, UnitVector3, Vector3};
+use nalgebra::{Point3, Vector3, UnitVector3};
 
 use crate::{geometry::closest::Closest, state::Agent};
 
@@ -38,14 +38,19 @@ impl BoundaryConfig {
         a: &Agent,
         i: usize,
         positive: bool,
-    ) -> (Point3<f64>, Point3<f64>) {
-        let normal = UnitVector3::new_unchecked(Vector3::ith(i, if positive { -1.0 } else { 1.0 }));
+    ) -> (Point3<f64>, UnitVector3<f64>, f64) {
+        let normal = Vector3::ith(i, if positive { -1.0 } else { 1.0 });
         let subject_point = a.seg.furthest_point_along_axis(i, positive);
         let boundary_point = self.closest_point_on_boundary(subject_point, i, positive);
-        (subject_point, boundary_point)
+
+        let bound_to_seg = subject_point - boundary_point;
+
+        let seg_overlap = -bound_to_seg.dot(&normal);
+
+        (subject_point, UnitVector3::new_normalize(normal), seg_overlap)
     }
 
-    pub fn agent_closest_points_on_boundaries(&self, a: &Agent) -> Vec<(Point3<f64>, Point3<f64>)> {
+    pub fn agent_closest_points_on_boundaries(&self, a: &Agent) -> Vec<(Point3<f64>, UnitVector3<f64>, f64)> {
         self.0
             .iter()
             .enumerate()

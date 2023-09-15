@@ -6,6 +6,7 @@ use diesel::prelude::*;
 use dotenvy::dotenv;
 use nalgebra::Point3;
 use std::env;
+use diesel::result::Error;
 use time;
 
 pub mod models;
@@ -40,9 +41,12 @@ pub fn write_checkpoint(
     rid: usize,
     sim_state: &SimState,
     summary: Option<Vec<AgentStepSummary>>,
-) -> i32 {
+) -> Result<i32, Error> {
     use crate::db::schema::env::dsl::*;
     use diesel::dsl::Eq;
+
+    let eid = conn.transaction::<i32, Error, _>(|conn| {
+
     let eid: i32 = diesel::insert_into(env)
         .values((
             None::<Eq<id, i32>>,
@@ -51,8 +55,7 @@ pub fn write_checkpoint(
             t.eq(sim_state.t),
         ))
         .returning(id)
-        .get_result(conn)
-        .unwrap();
+        .get_result(conn)?;
 
     use crate::db::schema::agent::dsl::*;
     let rows: Vec<_> = sim_state
@@ -80,9 +83,11 @@ pub fn write_checkpoint(
 
     diesel::insert_into(agent)
         .values(rows)
-        .execute(conn)
-        .unwrap();
-    eid
+        .execute(conn)?;
+    Ok(eid)
+    })?;
+
+    Ok(eid)
 }
 
 pub fn read_latest_run_id(conn: &mut PgConnection) -> usize {

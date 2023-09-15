@@ -1,4 +1,4 @@
-use nalgebra::{Point2, Point3, Vector2, Vector3};
+use nalgebra::{Point2, Point3, Vector2, Vector3, UnitVector3};
 
 pub mod capsule;
 pub mod point;
@@ -57,4 +57,8 @@ pub fn angle_to_x(v: &Vector2<f64>) -> f64 {
     } else {
         angle
     }
+}
+
+pub fn reverse_unit_vector(v: &UnitVector3<f64>) -> UnitVector3<f64> {
+  UnitVector3::new_unchecked(-v.into_inner())
 }

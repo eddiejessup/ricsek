@@ -139,10 +139,6 @@ fn update_agent_points(
                     1e6 * agent_summary.torque_agent_electro,
                 ),
                 (
-                    flow::VectorLabel("f_agent_hydro".to_string()),
-                    agent_summary.f_agent_hydro,
-                ),
-                (
                     flow::VectorLabel("f_propulsion".to_string()),
                     agent_summary.f_propulsion,
                 ),
@@ -155,8 +151,12 @@ fn update_agent_points(
                     1e6 * agent_summary.torque_boundary_electro,
                 ),
                 (
-                    flow::VectorLabel("f_singularity".to_string()),
-                    agent_summary.f_singularity,
+                    flow::VectorLabel("v_fluid_back".to_string()),
+                    1e-6 * agent_summary.v_fluid_back,
+                ),
+                (
+                    flow::VectorLabel("v_fluid_front".to_string()),
+                    1e-6 * agent_summary.v_fluid_front,
                 ),
             ])
         }
@@ -285,7 +285,7 @@ fn main() {
         .insert_resource(FlowViewState::new(10000))
         .insert_resource(ViewState::default())
         .add_systems(Startup, add_camera)
-        // .add_systems(Startup, add_axis_arrows)
+        .add_systems(Startup, add_axis_arrows)
         .add_systems(Startup, add_agents)
         .add_systems(Startup, environment::add_environment)
         .add_systems(PostStartup, flow::add_flow)

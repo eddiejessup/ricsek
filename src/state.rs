@@ -10,11 +10,11 @@ use crate::geometry::{
 pub struct AgentStepSummary {
     pub f_agent_electro: Vector3<f64>,
     pub torque_agent_electro: Vector3<f64>,
-    pub f_agent_hydro: Vector3<f64>,
     pub f_propulsion: Vector3<f64>,
     pub f_boundary_electro: Vector3<f64>,
     pub torque_boundary_electro: Vector3<f64>,
-    pub f_singularity: Vector3<f64>,
+    pub v_fluid_front: Vector3<f64>,
+    pub v_fluid_back: Vector3<f64>,
 }
 
 pub struct SimState {
