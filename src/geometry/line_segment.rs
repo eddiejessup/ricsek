@@ -8,6 +8,7 @@ pub struct LineSegment {
     pub end: Point3<f64>,
 }
 
+#[derive(Debug, Clone)]
 pub struct BoundingBox {
     pub min: Point3<f64>,
     pub max: Point3<f64>,
@@ -21,6 +22,21 @@ impl BoundingBox {
             && self.max.y >= b.min.y
             && self.min.z <= b.max.z
             && self.max.z >= b.min.z
+    }
+
+    pub fn union(&self, b: &BoundingBox) -> BoundingBox {
+        BoundingBox {
+            min: Point3::new(
+                self.min.x.min(b.min.x),
+                self.min.y.min(b.min.y),
+                self.min.z.min(b.min.z),
+            ),
+            max: Point3::new(
+                self.max.x.max(b.max.x),
+                self.max.y.max(b.max.y),
+                self.max.z.max(b.max.z),
+            ),
+        }
     }
 }
 

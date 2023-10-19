@@ -1,6 +1,6 @@
 use core::panic;
 
-use nalgebra::Vector3;
+use nalgebra::{Matrix3, Vector3};
 
 // r is the vector pointing from the singularity to the point of interest.
 
@@ -11,6 +11,40 @@ fn safe_magnitude(r: Vector3<f64>) -> f64 {
     } else {
         rm
     }
+}
+
+// T_ijk = −6 \hat{r}_i \hat{r}_j \hat{r}_k / |r|^5
+pub fn stokeslet_stress_matrix(r: Vector3<f64>) -> [[[f64; 3]; 3]; 3] {
+    let coeff = -6.0 / safe_magnitude(r).powi(5);
+
+    let mut result = [[[0.0; 3]; 3]; 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            for k in 0..3 {
+                result[i][j][k] = coeff * r[i] * r[j] * r[k];
+            }
+        }
+    }
+    result
+}
+
+// G_ij = δ_ij/|r| + r_i r_j/|r|^3
+pub fn stokeslet_matrix(r: Vector3<f64>) -> Matrix3<f64> {
+    let rm = safe_magnitude(r); // |r|
+    let rm_inv = 1.0 / rm; // 1/|r|
+    let rm_inv3 = rm_inv.powi(3); // 1/|r|^3
+
+    // Compute the individual components of the matrix
+    let mut g = Matrix3::zeros(); // Initialize a 3x3 zero matrix
+    for i in 0..3 {
+        for j in 0..3 {
+            if i == j {
+                g[(i, j)] = rm_inv;
+            }
+            g[(i, j)] += r[i] * r[j] * rm_inv3;
+        }
+    }
+    g
 }
 
 // Source: https://sci-hub.ee/10.1017/S0022112075000614, Eq. 3a

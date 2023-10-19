@@ -81,10 +81,10 @@ pub fn add_axis_arrows(
         (Vec3::Y, Color::GREEN),
         (Vec3::Z, Color::BLUE),
     ] {
-        // Arrow facing along x-axis
         commands
             .spawn(SpatialBundle::from_transform(
                 Transform::default()
+                    .with_translation(Vec3 { x: 10.0, y: 10.0, z: 10.0 })
                     .looking_to(ax, Vec3::Y)
                     .with_scale(Vec3::splat(1.0)),
             ))

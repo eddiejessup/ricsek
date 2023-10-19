@@ -1,5 +1,9 @@
 use std::f64::consts::PI;
 
+use nalgebra::{Point3, Vector3};
+
+use crate::geometry::{capsule::Capsule, line_segment::LineSegment};
+
 use super::{common::BoundaryConfig, simulation::SimParams};
 
 // Derive JSON deserialize for PhysicalParams.
@@ -28,21 +32,25 @@ pub struct PhysicalParams {
 }
 
 impl PhysicalParams {
-  pub fn agent_inter_sphere_length(&self) -> f64 {
-    // Get length of the cylinder part.
-    let r = self.agent_length - 2.0 * self.agent_radius;
-    if r < 0.0 {
-        panic!("Agent length must be greater than 2 * agent radius.")
-    } else {
-        r
+    pub fn agent_inter_sphere_length(&self) -> f64 {
+        // Get length of the cylinder part.
+        let r = self.agent_length - 2.0 * self.agent_radius;
+        if r < 0.0 {
+            panic!("Agent length must be greater than 2 * agent radius.")
+        } else {
+            r
+        }
     }
-}
 
     fn agent_volume(&self) -> f64 {
-      // Volume of a cylinder plus two end-half-spheres.
-      (PI * self.agent_radius.powi(2) * self.agent_inter_sphere_length())
-      +
-      (4.0 / 3.0) * PI * self.agent_radius.powi(3)
+        Capsule {
+            segment: LineSegment {
+                start: Point3::origin(),
+                end: Point3::origin() + Vector3::new(0.0, 0.0, self.agent_inter_sphere_length()),
+            },
+            radius: self.agent_radius,
+        }
+        .volume()
     }
 
     fn agent_effective_radius(&self) -> f64 {

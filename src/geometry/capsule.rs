@@ -1,3 +1,5 @@
+use std::f64::consts::PI;
+
 use nalgebra::{Point3, Unit, UnitVector3, Vector3};
 
 use super::{
@@ -26,6 +28,16 @@ impl Capsule {
 
     pub fn width(&self) -> f64 {
         2.0 * self.radius
+    }
+
+    pub fn volume(&self) -> f64 {
+        // Volume of a cylinder plus two end-half-spheres.
+        (PI * self.radius.powi(2) * self.segment_length()) + (4.0 / 3.0) * PI * self.radius.powi(3)
+    }
+
+    pub fn area(&self) -> f64 {
+        // Area of a cylinder plus two end-caps.
+        (2.0 * PI * self.radius * self.segment_length()) + (4.0 * PI * self.radius.powi(2))
     }
 
     pub fn closest_point(
