@@ -37,6 +37,11 @@ log = "0.4"
 tobj = { version = "4", features = ["ahash"] }
 csv = { version = "1.2" }
 bevy_obj = { version = "0.11" }
+libc = "0.2"
+approx = "0.5"
+
+[build-dependencies]
+bindgen = "0.65"
 
 [[bin]]
 name = "initialize"

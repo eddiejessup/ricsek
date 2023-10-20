@@ -58,7 +58,8 @@ pub fn agent_agents_electro(
     agent_radius: f64,
     electro_coeff: f64,
 ) -> (Vector3<f64>, Vector3<f64>) {
-    agents.iter()
+    agents
+        .iter()
         .enumerate()
         .fold((zero(), zero()), |(f_tot, torque_tot), (i2, a2)| {
             if i1 == i2 {
@@ -71,25 +72,33 @@ pub fn agent_agents_electro(
 }
 
 // Super naive implementation.
+pub fn agents_agents_electro(
+    agents: &[Agent],
+    agent_radius: f64,
+    electro_coeff: f64,
+) -> Vec<(Vector3<f64>, Vector3<f64>)> {
+    agents
+        .iter()
+        .enumerate()
+        .map(|(i_agent, agent)| {
+            agent_agents_electro(agent, i_agent, &agents, agent_radius, electro_coeff)
+        })
+        .collect()
+}
+
+// Super naive implementation.
 pub fn agent_fluid_v(a: &Agent, f0: f64, r: Point3<f64>) -> Vector3<f64> {
     let u = a.u();
     stokeslet_u(u.scale(-f0), r - a.seg.start) + stokeslet_u(u.scale(f0), r - a.seg.end)
 }
 
-pub fn agents_fluid_v(
-  r1: Point3<f64>,
-  i1: usize,
-  agents: &[Agent],
-  f0: f64,
-) -> Vector3<f64> {
-  agents.iter()
-      .enumerate()
-      .fold(zero(), |v_tot, (i2, a2)| {
-          if i1 == i2 {
-              v_tot
-          } else {
-              let v = agent_fluid_v(a2, f0, r1);
-              v_tot + v
-          }
-      })
+pub fn agents_fluid_v(r1: Point3<f64>, i1: usize, agents: &[Agent], f0: f64) -> Vector3<f64> {
+    agents.iter().enumerate().fold(zero(), |v_tot, (i2, a2)| {
+        if i1 == i2 {
+            v_tot
+        } else {
+            let v = agent_fluid_v(a2, f0, r1);
+            v_tot + v
+        }
+    })
 }
