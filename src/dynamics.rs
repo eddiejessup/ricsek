@@ -8,31 +8,52 @@ use std::f64::consts::PI;
 
 use crate::config::run::RunConfig;
 use crate::config::setup::parameters::simulation::SimParams;
+use crate::config::setup::parameters::singularities::{
+    singularities_fluid_v_multi, Singularity, SingularityParams,
+};
 use crate::dynamics::brownian::{rot_brownian_distr, trans_brownian_distr};
 use crate::geometry::point::random_vector;
 use crate::state::*;
 use diesel::result::Error;
 use log::{debug, info};
-use nalgebra::{Point3, Rotation3, UnitVector3, Vector3};
+use nalgebra::{Rotation3, UnitVector3, Vector3};
 use rand_distr::{Normal, Uniform};
 
-use self::agent::{agents_agents_electro, agents_fluid_v};
+use self::agent::agents_agents_electro;
 
-pub fn fluid_v_at(
-    sim_params: &SimParams,
-    r: Point3<f64>,
-    i_agent: usize,
-    agents: &[Agent],
-) -> Vector3<f64> {
-    // Singularity contribution to flow.
-    let v_fluid_singularity = sim_params
-        .singularities
+pub fn agents_v_fluids(sim_params: &SimParams, agents: &[Agent]) -> Vec<Vector3<f64>> {
+    let eval_points = agents
         .iter()
-        .map(|singularity| singularity.eval(r))
-        .sum::<Vector3<f64>>();
-    // Other-agent contribution to flow.
-    let v_fluid_agents = agents_fluid_v(r, i_agent, agents, sim_params.agent_propulsion_force);
-    v_fluid_singularity + v_fluid_agents
+        .enumerate()
+        .map(|(i_agent, agent)| (i_agent, agent.seg.centroid()))
+        .collect();
+    let singularities: Vec<(usize, Singularity)> = agents
+        .iter()
+        .enumerate()
+        .flat_map(|(i_agent, agent)| {
+            vec![
+                (
+                    i_agent,
+                    Singularity {
+                        point: agent.seg.start,
+                        params: SingularityParams::Stokeslet {
+                            a: agent.u().scale(-sim_params.agent_propulsion_force),
+                        },
+                    },
+                ),
+                (
+                    i_agent,
+                    Singularity {
+                        point: agent.seg.end,
+                        params: SingularityParams::Stokeslet {
+                            a: agent.u().scale(sim_params.agent_propulsion_force),
+                        },
+                    },
+                ),
+            ]
+        })
+        .collect();
+    singularities_fluid_v_multi(eval_points, &singularities)
 }
 
 pub fn force_balance_v(
@@ -60,14 +81,14 @@ pub fn update(
     let uniform_theta = Uniform::new(0.0, 2.0 * PI);
     let uniform_cos_phi = Uniform::new(-1.0, 1.0);
 
-    let agents = sim_state.agents.clone();
-
     // Agent-agent electrostatic repulsion.
     let agent_agent_electro_wrenches: Vec<_> = agents_agents_electro(
         &sim_state.agents,
         sim_params.agent_radius,
         sim_params.agent_object_hertz_force_coefficient,
     );
+
+    let v_fluids: Vec<_> = agents_v_fluids(sim_params, &sim_state.agents);
 
     let mut agent_summaries: Vec<AgentStepSummary> = vec![];
     for (i_agent, mut agent) in sim_state.agents.iter_mut().enumerate() {
@@ -90,7 +111,7 @@ pub fn update(
         );
 
         debug!("Doing force balance calculation for linear velocity");
-        let v_fluid = fluid_v_at(sim_params, agent.seg.centroid(), i_agent, &agents);
+        let v_fluid = v_fluids[i_agent];
         let v_object = force_balance_v(
             sim_params,
             v_fluid,

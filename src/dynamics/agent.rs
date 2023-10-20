@@ -2,7 +2,7 @@ use nalgebra::{zero, Point3, UnitVector3, Vector3};
 
 use crate::state::Agent;
 
-use super::{electro::electro_kinematics, stokes_solutions::stokeslet_u};
+use super::electro::electro_kinematics;
 
 pub fn agent_x_electro(
     f: Vector3<f64>,
@@ -84,21 +84,4 @@ pub fn agents_agents_electro(
             agent_agents_electro(agent, i_agent, &agents, agent_radius, electro_coeff)
         })
         .collect()
-}
-
-// Super naive implementation.
-pub fn agent_fluid_v(a: &Agent, f0: f64, r: Point3<f64>) -> Vector3<f64> {
-    let u = a.u();
-    stokeslet_u(u.scale(-f0), r - a.seg.start) + stokeslet_u(u.scale(f0), r - a.seg.end)
-}
-
-pub fn agents_fluid_v(r1: Point3<f64>, i1: usize, agents: &[Agent], f0: f64) -> Vector3<f64> {
-    agents.iter().enumerate().fold(zero(), |v_tot, (i2, a2)| {
-        if i1 == i2 {
-            v_tot
-        } else {
-            let v = agent_fluid_v(a2, f0, r1);
-            v_tot + v
-        }
-    })
 }
