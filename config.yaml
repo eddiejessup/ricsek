@@ -22,7 +22,7 @@ parameters:
   agent_propulsion_force: 0.5e-12
 agent_initialization:
   - type: RandomUniformByNumber
-    number: 100
+    number: 1000
   # - type: Explicit
   #   agents:
   #     - r: [-9.0e-6, +0.01e-6, +0.0e-6]

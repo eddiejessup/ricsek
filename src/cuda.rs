@@ -1,78 +1,111 @@
 #![allow(non_snake_case)]
 
+use core::panic;
+
 use nalgebra::{Point3, Vector3};
+
+use crate::config::setup::parameters::singularities::{Singularity, SingularityParams};
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 pub struct LinearFieldsContext {
     device_data: *mut DeviceData,
-    num_elements: usize,
+    num_eval_points: usize,
 }
 
 impl LinearFieldsContext {
-    pub fn new(num_elements: usize, l: Vector3<f64>) -> Self {
-        let device_data = unsafe { init(num_elements as u64, l.x, l.y, l.z) };
+    pub fn new(num_eval_points: usize, num_singularities: usize, l: Vector3<f64>) -> Self {
+        let device_data = unsafe {
+            init(
+                num_eval_points as u32,
+                num_singularities as u32,
+                l.x as f32,
+                l.y as f32,
+                l.z as f32,
+            )
+        };
         Self {
             device_data,
-            num_elements,
+            num_eval_points,
         }
     }
 
-    pub fn populate_pairwise_distances(&self, positions: &mut [Point3<f64>], threads_per_block: u32) {
-        let mut flat_positions = vector3_vec_to_c_array(positions);
-        println!("flat_positions = {:?}", flat_positions);
+    pub fn evaluate(
+        &self,
+        eval_points: &[(usize, Point3<f64>)],
+        singularities: &[(usize, Singularity)],
+        threads_per_blockAxis: u32,
+    ) -> Vec<Vector3<f64>> {
+        let mut eval_points_c: Vec<ObjectPoint> = eval_points
+            .iter()
+            .map(|(object_id, position)| ObjectPoint {
+                object_id: *object_id as u32,
+                position: V3 {
+                    x: position.x as f32,
+                    y: position.y as f32,
+                    z: position.z as f32,
+                },
+            })
+            .collect();
+
+        let mut stokeslets_c: Vec<Stokeslet> = singularities
+            .iter()
+            .map(|(object_id, singularity)| {
+                let object_point = ObjectPoint {
+                    object_id: *object_id as u32,
+                    position: V3 {
+                        x: singularity.point.x as f32,
+                        y: singularity.point.y as f32,
+                        z: singularity.point.z as f32,
+                    },
+                };
+                match singularity.params {
+                    SingularityParams::Stokeslet { a } => Stokeslet {
+                        object_point,
+                        force: V3 {
+                            x: a.x as f32,
+                            y: a.y as f32,
+                            z: a.z as f32,
+                        },
+                    },
+                    SingularityParams::StokesDoublet { a: _, b: _ } => {
+                        panic!("StokesDoublet not supported")
+                    }
+                    SingularityParams::Rotlet { c: _ } => panic!("Rotlet not supported"),
+                    SingularityParams::Stresslet { a: _, b: _ } => {
+                        panic!("Stresslet not supported")
+                    }
+                    SingularityParams::PotentialDoublet { d: _ } => {
+                        panic!("PotentialDoublet not supported")
+                    }
+                }
+            })
+            .collect();
+
+        let mut eval_point_velocities = vec![
+            V3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0
+            };
+            self.num_eval_points
+        ];
+
         unsafe {
-          populatePairwiseDistances(
+            evaluateStokeslets(
                 self.device_data,
-                flat_positions.as_mut_ptr(),
-                threads_per_block,
+                eval_points_c.as_mut_ptr(),
+                stokeslets_c.as_mut_ptr(),
+                eval_point_velocities.as_mut_ptr(),
+                threads_per_blockAxis,
             );
         }
+
+        eval_point_velocities
+            .iter()
+            .map(|v| Vector3::new(v.x as f64, v.y as f64, v.z as f64))
+            .collect()
     }
-
-    pub fn fetch_pairwise_distances(&self) -> Vec<Vector3<f64>> {
-        let mut flat_distances = vec![0.0; self.num_elements * self.num_elements * 3];
-      unsafe {
-        fetchPairwiseDistances(
-              self.device_data,
-              flat_distances.as_mut_ptr(),
-          );
-        }
-        println!("flat_distances = {:?}", flat_distances);
-        c_array_to_vector3_vec(&flat_distances)
-
-  }
-
-    pub fn net_forces(&self, threads_per_block: u32) -> Vec<Vector3<f64>> {
-        // Allocate forces array of size `num_elements`.
-        let mut flat_forces = vec![0.0; self.num_elements * 3];
-        unsafe {
-            netForces(
-                self.device_data,
-                flat_forces.as_mut_ptr(),
-                threads_per_block,
-            );
-        }
-        c_array_to_vector3_vec(&flat_forces)
-    }
-}
-
-fn vector3_vec_to_c_array(xs: &[Point3<f64>]) -> Vec<f64> {
-    let mut c_array = Vec::with_capacity(3 * xs.len());
-    for x in xs {
-        c_array.push(x.coords.x);
-        c_array.push(x.coords.y);
-        c_array.push(x.coords.z);
-    }
-    c_array
-}
-
-fn c_array_to_vector3_vec(xs: &[f64]) -> Vec<Vector3<f64>> {
-    let mut vector3_vec = Vec::with_capacity(xs.len() / 3);
-    for i in 0..xs.len() / 3 {
-        vector3_vec.push(Vector3::new(xs[3 * i], xs[3 * i + 1], xs[3 * i + 2]));
-    }
-    vector3_vec
 }
 
 impl Drop for LinearFieldsContext {

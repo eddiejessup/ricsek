@@ -52,7 +52,7 @@ pub fn singularities_fluid_v(
 }
 
 pub fn singularities_fluid_v_multi(
-    eval_points: Vec<(usize, Point3<f64>)>,
+    eval_points: &[(usize, Point3<f64>)],
     singularities: &[(usize, Singularity)],
 ) -> Vec<Vector3<f64>> {
     eval_points

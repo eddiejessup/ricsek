@@ -1,4 +1,4 @@
-use log::{info, warn};
+use log::info;
 use ricsek::{config, state::*};
 
 fn main() {
@@ -9,7 +9,6 @@ fn main() {
     let sim_params = &config.parameters;
 
     let mut rng = rand::thread_rng();
-    warn!("{}", 1e6 * sim_params.agent_inter_sphere_length);
     let agents: Vec<Agent> = config
         .agent_initialization
         .iter()

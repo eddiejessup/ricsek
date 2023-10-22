@@ -8,12 +8,10 @@ use std::f64::consts::PI;
 
 use crate::config::run::RunConfig;
 use crate::config::setup::parameters::simulation::SimParams;
-use crate::config::setup::parameters::singularities::{
-    singularities_fluid_v_multi, Singularity, SingularityParams,
-};
+use crate::config::setup::parameters::singularities::{Singularity, SingularityParams};
 use crate::dynamics::brownian::{rot_brownian_distr, trans_brownian_distr};
 use crate::geometry::point::random_vector;
-use crate::state::*;
+use crate::{cuda, state::*};
 use diesel::result::Error;
 use log::{debug, info};
 use nalgebra::{Rotation3, UnitVector3, Vector3};
@@ -21,13 +19,17 @@ use rand_distr::{Normal, Uniform};
 
 use self::agent::agents_agents_electro;
 
-pub fn agents_v_fluids(sim_params: &SimParams, agents: &[Agent]) -> Vec<Vector3<f64>> {
-    let eval_points = agents
+pub fn agents_v_fluids(
+    sim_params: &SimParams,
+    agents: &[Agent],
+    gpu_context: &cuda::LinearFieldsContext,
+) -> Vec<Vector3<f64>> {
+    let eval_points: Vec<_> = agents
         .iter()
         .enumerate()
         .map(|(i_agent, agent)| (i_agent, agent.seg.centroid()))
         .collect();
-    let singularities: Vec<(usize, Singularity)> = agents
+    let singularities: Vec<_> = agents
         .iter()
         .enumerate()
         .flat_map(|(i_agent, agent)| {
@@ -53,7 +55,8 @@ pub fn agents_v_fluids(sim_params: &SimParams, agents: &[Agent]) -> Vec<Vector3<
             ]
         })
         .collect();
-    singularities_fluid_v_multi(eval_points, &singularities)
+    // singularities_fluid_v_multi(eval_points, &singularities)
+    gpu_context.evaluate(&eval_points, &singularities, 32)
 }
 
 pub fn force_balance_v(
@@ -76,6 +79,7 @@ pub fn update(
     sim_state: &mut SimState,
     trans_diff_distr: Normal<f64>,
     rot_diff_distr: Normal<f64>,
+    gpu_context: &cuda::LinearFieldsContext,
     rng: &mut rand::rngs::ThreadRng,
 ) -> Vec<AgentStepSummary> {
     let uniform_theta = Uniform::new(0.0, 2.0 * PI);
@@ -88,7 +92,7 @@ pub fn update(
         sim_params.agent_object_hertz_force_coefficient,
     );
 
-    let v_fluids: Vec<_> = agents_v_fluids(sim_params, &sim_state.agents);
+    let v_fluids: Vec<_> = agents_v_fluids(sim_params, &sim_state.agents, gpu_context);
 
     let mut agent_summaries: Vec<AgentStepSummary> = vec![];
     for (i_agent, mut agent) in sim_state.agents.iter_mut().enumerate() {
@@ -180,6 +184,11 @@ pub fn run(
     );
 
     let rng = &mut rand::thread_rng();
+    let gpu_context = cuda::LinearFieldsContext::new(
+        sim_state.agents.len(),
+        2 * sim_state.agents.len(), // TODO: Assume two stokeslets per agent for now.
+        sim_params.boundaries.l(),
+    );
 
     while sim_state.t < run_params.t_max {
         let summaries = update(
@@ -187,6 +196,7 @@ pub fn run(
             &mut sim_state,
             trans_diff_distr,
             rot_diff_distr,
+            &gpu_context,
             rng,
         );
 
