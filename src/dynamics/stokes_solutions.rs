@@ -64,9 +64,21 @@ pub fn stokes_doublet_chwang_u(a: Vector3<f64>, b: Vector3<f64>, r: Vector3<f64>
     rotlet_chwang_u(c, r) + stresslet_chwang_u(a, b, r)
 }
 
+pub fn stokes_doublet_chwang_vort(
+    _a: Vector3<f64>,
+    _b: Vector3<f64>,
+    _r: Vector3<f64>,
+) -> Vector3<f64> {
+    panic!("Not implemented");
+}
+
 pub fn rotlet_chwang_u(c: Vector3<f64>, r: Vector3<f64>) -> Vector3<f64> {
     let rm = safe_magnitude(r);
     c.cross(&r) / rm.powi(3)
+}
+
+pub fn rotlet_chwang_vort(_c: Vector3<f64>, _r: Vector3<f64>) -> Vector3<f64> {
+    panic!("Not implemented");
 }
 
 pub fn stresslet_chwang_u(a: Vector3<f64>, b: Vector3<f64>, r: Vector3<f64>) -> Vector3<f64> {
@@ -76,9 +88,17 @@ pub fn stresslet_chwang_u(a: Vector3<f64>, b: Vector3<f64>, r: Vector3<f64>) -> 
     (term_1 + term_2) * r
 }
 
+pub fn stresslet_chwang_vort(_a: Vector3<f64>, _b: Vector3<f64>, _r: Vector3<f64>) -> Vector3<f64> {
+    panic!("Not implemented");
+}
+
 pub fn potential_doublet_chwang_u(d: Vector3<f64>, r: Vector3<f64>) -> Vector3<f64> {
     let rm = r.magnitude();
     let term_1 = -d / rm.powi(3);
     let term_2 = 3.0 * (d.dot(&r) * r) / rm.powi(5);
     term_1 + term_2
+}
+
+pub fn potential_doublet_chwang_vort(_d: Vector3<f64>, _r: Vector3<f64>) -> Vector3<f64> {
+    panic!("Not implemented");
 }

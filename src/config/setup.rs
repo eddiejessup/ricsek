@@ -55,12 +55,12 @@ Simulation parameters:
       Rotational diffusion randomisation timescale: {t_rot_diff:.1} s
       System crossing time (s): {t_cross:.1}",
             dt = self.parameters.dt,
-            l = 1e6 * self.parameters.boundaries.l(),
-            d_trans_diff = 1e12 * self.parameters.agent_translational_diffusion_coefficient,
+            l = self.parameters.boundaries.l(),
+            d_trans_diff = self.parameters.agent_translational_diffusion_coefficient,
             d_rot_diff = self.parameters.agent_rotational_diffusion_coefficient,
-            ag_v_propulse = 1e6 * self.parameters.agent_propulsion_speed(),
-            ag_radius = 1e6 * self.parameters.agent_radius,
-            ag_mobility = 1e6 * self.parameters.agent_translational_mobility / 1e12,
+            ag_v_propulse = self.parameters.agent_propulsion_speed(),
+            ag_radius = self.parameters.agent_radius,
+            ag_mobility = self.parameters.agent_translational_mobility,
             t_rot_diff = std::f64::consts::PI * std::f64::consts::PI
                 / (4.0 * self.parameters.agent_rotational_diffusion_coefficient),
             t_cross = self.parameters.boundaries.l() / self.parameters.agent_propulsion_speed(),

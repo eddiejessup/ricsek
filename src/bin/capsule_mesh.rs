@@ -31,7 +31,7 @@ pub struct TriangleSet {
     pub triangles: Vec<(Triangle, Vector3<f64>)>,
 }
 
-const LENGTH_FACTOR: f64 = 1e-6;
+const LENGTH_FACTOR: f64 = 1.0;
 // const MESH_PATH: &str = "meshes/plane_10x10.obj";
 // const MESH_PATH: &str = "meshes/sphere.obj";
 // const MESH_PATH: &str = "meshes/sphere_5seg.obj";

@@ -6,7 +6,11 @@ use crate::{
     state::Agent,
 };
 
-use super::{agent::agent_x_electro, electro::electro_kinematics};
+use super::{
+    agent::capsule_electro_torque,
+    common::{zero_wrench, Wrench},
+    electro::electro_kinematics,
+};
 
 fn wrap1(com: f64, x: f64, l: f64) -> f64 {
     match (com / (l * 0.5)) as i64 {
@@ -92,25 +96,25 @@ pub fn boundary_electro(
     agent_radius: f64,
     boundaries: &BoundaryConfig,
     electro_coeff: f64,
-) -> (Vector3<f64>, Vector3<f64>) {
+) -> Wrench {
     boundaries
         .agent_closest_points_on_boundaries(a)
         .iter()
         .fold(
-            (Vector3::zeros(), Vector3::zeros()),
-            |(f_tot, torque_tot), (closest_point_segment, normal, seg_overlap)| {
+            zero_wrench(),
+            |w_tot, (closest_point_segment, normal, seg_overlap)| {
                 let overlap = agent_radius + seg_overlap;
-                let f = electro_kinematics(*normal, overlap, electro_coeff);
+                let force = electro_kinematics(*normal, overlap, electro_coeff);
 
-                let (f, torque) = agent_x_electro(
-                    f,
+                let torque = capsule_electro_torque(
+                    force,
                     *closest_point_segment,
                     reverse_unit_vector(normal),
                     agent_radius,
-                    a,
+                    &a.seg,
                 );
 
-                (f_tot + f, torque_tot + torque)
+                w_tot + Wrench { force, torque }
             },
         )
 }

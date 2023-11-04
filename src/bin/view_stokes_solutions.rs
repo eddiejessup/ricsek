@@ -107,20 +107,20 @@ fn main() {
   let env = environment::Environment {
         boundaries: BoundaryConfig(Vector3::new(
             AxisBoundaryConfig {
-                l: 200.0e-6,
+                l: 200.0,
                 closed: true,
             },
             AxisBoundaryConfig {
-                l: 200.0e-6,
+                l: 200.0,
                 closed: true,
             },
             AxisBoundaryConfig {
-                l: 200.0e-6,
+                l: 200.0,
                 closed: true,
             },
         )),
-        arrow_length: 2.0e-6,
-        length_factor: 1e6,
+        arrow_length: 2.0,
+        length_factor: 1.0,
     };
 
     let mut sample_rs = Vec::new();
@@ -130,13 +130,13 @@ fn main() {
 
     let sample_l = nalgebra::Vector2::new(env.boundaries.l().x, env.boundaries.l().y);
     let sample_z = env.boundaries.l_half().z;
-    let step = 10.0e-6;
+    let step = 10.0;
     for p in ricsek::geometry::grid_2d(sample_l, step) {
         sample_rs.push(Point3::new(p.x, p.y, sample_z));
         sample_rs.push(Point3::new(p.x, p.y, -sample_z));
     }
 
-    let stokeslet_strength = 10.0e-17;
+    let stokeslet_strength = 10.0e-5;
     let stokeslet_force = Vector3::new(0.0, stokeslet_strength, 0.0);
     let stokeslet_origin_point = Point3::origin();
     let stokeslet_origin = Singularity {
@@ -242,7 +242,7 @@ fn main() {
             vs: flow::VectorSet(
                 singularities
                     .iter()
-                    .map(|(label, s)| (label.clone(), s.eval(*r)))
+                    .map(|(label, s)| (label.clone(), s.eval(*r).0))
                     .collect(),
             ),
         })
@@ -254,7 +254,7 @@ fn main() {
         .insert_resource(env)
         .insert_resource(MarkerSet(markers))
         .insert_resource(SingularitySet(singularities))
-        .insert_resource(FlowViewState::new(n_samples))
+        .insert_resource(FlowViewState::new(n_samples, 0.05))
         .add_systems(
             Startup,
             (

@@ -18,7 +18,6 @@ pub struct PhysicalParams {
     pub agent_radius: f64,
     // Length includes the 'caps'.
     pub agent_length: f64,
-    pub agent_linear_spring_stiffness: f64,
     // Stiffness of both agents and surfaces.
     // (Used to compute the strength of agent-{agent, surface} electrostatics)
     pub object_stiffness: f64,
@@ -77,8 +76,13 @@ impl PhysicalParams {
         1.0 / self.agent_stokes_rotational_resistance()
     }
 
+    pub fn agent_propulsive_stokeslet_strength(&self) -> f64 {
+      self.agent_propulsion_force / (8.0 * PI * self.fluid_viscosity)
+    }
+
     fn thermal_energy(&self) -> f64 {
-        physical_constants::BOLTZMANN_CONSTANT * self.fluid_temperature
+        // Boltzmann in length-units of microns.
+        1e12 * physical_constants::BOLTZMANN_CONSTANT * self.fluid_temperature
     }
 
     fn agent_stokes_translational_diffusion_coefficient(&self) -> f64 {
@@ -102,10 +106,10 @@ impl PhysicalParams {
             singularities: self.singularities.clone(),
             agent_radius: self.agent_radius,
             agent_inter_sphere_length: self.agent_inter_sphere_length(),
-            agent_linear_spring_stiffness: self.agent_linear_spring_stiffness,
             agent_translational_mobility: self.agent_stokes_translational_mobility(),
             agent_rotational_mobility: self.agent_stokes_rotational_mobility(),
             agent_propulsion_force: self.agent_propulsion_force,
+            agent_propulsive_stokeslet_strength: self.agent_propulsive_stokeslet_strength(),
             agent_translational_diffusion_coefficient: self
                 .agent_stokes_translational_diffusion_coefficient(),
             agent_rotational_diffusion_coefficient: self

@@ -7,39 +7,6 @@ pub struct LineSegment {
     pub start: Point3<f64>,
     pub end: Point3<f64>,
 }
-
-#[derive(Debug, Clone)]
-pub struct BoundingBox {
-    pub min: Point3<f64>,
-    pub max: Point3<f64>,
-}
-
-impl BoundingBox {
-    pub fn overlaps(&self, b: BoundingBox) -> bool {
-        self.min.x <= b.max.x
-            && self.max.x >= b.min.x
-            && self.min.y <= b.max.y
-            && self.max.y >= b.min.y
-            && self.min.z <= b.max.z
-            && self.max.z >= b.min.z
-    }
-
-    pub fn union(&self, b: &BoundingBox) -> BoundingBox {
-        BoundingBox {
-            min: Point3::new(
-                self.min.x.min(b.min.x),
-                self.min.y.min(b.min.y),
-                self.min.z.min(b.min.z),
-            ),
-            max: Point3::new(
-                self.max.x.max(b.max.x),
-                self.max.y.max(b.max.y),
-                self.max.z.max(b.max.z),
-            ),
-        }
-    }
-}
-
 impl LineSegment {
     pub fn new(r: Point3<f64>, d: Vector3<f64>) -> Self {
         let (start, end) = Self::rs_from_centre(r, d);
@@ -156,6 +123,38 @@ impl Closest for LineSegment {
             } else {
                 self.end
             }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundingBox {
+    pub min: Point3<f64>,
+    pub max: Point3<f64>,
+}
+
+impl BoundingBox {
+    pub fn overlaps(&self, b: BoundingBox) -> bool {
+        self.min.x <= b.max.x
+            && self.max.x >= b.min.x
+            && self.min.y <= b.max.y
+            && self.max.y >= b.min.y
+            && self.min.z <= b.max.z
+            && self.max.z >= b.min.z
+    }
+
+    pub fn union(&self, b: &BoundingBox) -> BoundingBox {
+        BoundingBox {
+            min: Point3::new(
+                self.min.x.min(b.min.x),
+                self.min.y.min(b.min.y),
+                self.min.z.min(b.min.z),
+            ),
+            max: Point3::new(
+                self.max.x.max(b.max.x),
+                self.max.y.max(b.max.y),
+                self.max.z.max(b.max.z),
+            ),
         }
     }
 }

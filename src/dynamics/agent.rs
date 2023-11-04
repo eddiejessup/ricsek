@@ -1,87 +1,87 @@
-use nalgebra::{zero, Point3, UnitVector3, Vector3};
+use nalgebra::{Point3, UnitVector3, Vector3};
 
-use crate::state::Agent;
+use crate::geometry::{capsule::capsule_bounding_box, line_segment::LineSegment};
 
-use super::electro::electro_kinematics;
+use super::{
+    common::{zero_wrench, Wrench},
+    electro::electro_kinematics,
+};
 
-pub fn agent_x_electro(
+pub fn capsule_electro_torque(
     f: Vector3<f64>,
     closest_seg_point: Point3<f64>,
     u_seg_to_obj: UnitVector3<f64>,
-    agent_radius: f64,
-    a: &Agent,
-) -> (Vector3<f64>, Vector3<f64>) {
+    radius: f64,
+    s: &LineSegment,
+) -> Vector3<f64> {
     // The force is applied at the closest-point on the segment, plus the radius
-    // of the agent in the direction of the repulsing object.
-    let force_point = closest_seg_point + u_seg_to_obj.scale(agent_radius);
-    let moment_arm = force_point - a.seg.centroid();
-    let torque = moment_arm.cross(&f);
-
-    (f, torque)
+    // of the capsule in the direction of the repulsing object.
+    let force_point = closest_seg_point + u_seg_to_obj.scale(radius);
+    let moment_arm = force_point - s.centroid();
+    // println!("force_point={}, arm={}", force_point, moment_arm);
+    moment_arm.cross(&f)
 }
 
-pub fn agent_agent_electro(
-    a1: &Agent,
-    a2: &Agent,
-    agent_radius: f64,
+pub fn capsule_capsule_electro(
+    seg1: &LineSegment,
+    seg2: &LineSegment,
+    radius: f64,
     electro_coeff: f64,
-) -> (Vector3<f64>, Vector3<f64>) {
-    let might_overlap = a1
-        .bounding_box(agent_radius)
-        .overlaps(a2.bounding_box(agent_radius));
+) -> Wrench {
+    let might_overlap =
+        capsule_bounding_box(&seg1, radius).overlaps(capsule_bounding_box(&seg2, radius));
     if !might_overlap {
-        return (zero(), zero());
+        return zero_wrench();
     }
-    let (a1p, a2p) = a1.seg.approx_closest_points_on_segment(&a2.seg, 5);
-    let r1c_r2c = a2p - a1p;
+    let (seg1p, seg2p) = seg1.approx_closest_points_on_segment(&seg2, 5);
+    let r1c_r2c = seg2p - seg1p;
 
-    let f = electro_kinematics(
+    let force = electro_kinematics(
         UnitVector3::new_normalize(-r1c_r2c),
-        2.0 * agent_radius - r1c_r2c.magnitude(),
+        2.0 * radius - r1c_r2c.magnitude(),
         electro_coeff,
     );
 
-    agent_x_electro(
-        f,
-        a1p,
+    let torque = capsule_electro_torque(
+        force,
+        seg1p,
         UnitVector3::new_normalize(r1c_r2c),
-        agent_radius,
-        a1,
-    )
+        radius,
+        seg1,
+    );
+    println!("closest-point-on-i={}, overlap={}, force={}, torque={}", seg1p, 2.0 * radius - r1c_r2c.magnitude(), force, torque);
+    Wrench { force, torque }
 }
 
 // Super naive implementation.
-pub fn agent_agents_electro(
-    a1: &Agent,
+pub fn capsule_capsules_electro(
+    seg1: &LineSegment,
     i1: usize,
-    agents: &[Agent],
-    agent_radius: f64,
+    segs: &[LineSegment],
+    radius: f64,
     electro_coeff: f64,
-) -> (Vector3<f64>, Vector3<f64>) {
-    agents
-        .iter()
+) -> Wrench {
+    segs.iter()
         .enumerate()
-        .fold((zero(), zero()), |(f_tot, torque_tot), (i2, a2)| {
+        .fold(zero_wrench(), |w_tot, (i2, seg2)| {
             if i1 == i2 {
-                (f_tot, torque_tot)
+                w_tot
             } else {
-                let (f, torque) = agent_agent_electro(a1, a2, agent_radius, electro_coeff);
-                (f_tot + f, torque_tot + torque)
+                w_tot + capsule_capsule_electro(seg1, seg2, radius, electro_coeff)
             }
         })
 }
 
 // Super naive implementation.
-pub fn agents_agents_electro(
-    agents: &[Agent],
-    agent_radius: f64,
+pub fn capsules_capsules_electro(
+    segs: &[LineSegment],
+    radius: f64,
     electro_coeff: f64,
-) -> Vec<(Vector3<f64>, Vector3<f64>)> {
-    agents
-        .iter()
+) -> Vec<Wrench> {
+    segs.iter()
         .enumerate()
-        .map(|(i_agent, agent)| {
-            agent_agents_electro(agent, i_agent, &agents, agent_radius, electro_coeff)
+        .map(|(i_capsule, capsule)| {
+            capsule_capsules_electro(capsule, i_capsule, &segs, radius, electro_coeff)
         })
         .collect()
 }

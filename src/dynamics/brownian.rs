@@ -2,14 +2,8 @@ use nalgebra::{Rotation3, UnitVector3, Vector3};
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Normal, Uniform};
 
-pub fn trans_brownian_distr(d_diff: f64, dt: f64) -> Normal<f64> {
-    let l = (2.0 * d_diff * dt).sqrt();
-    Normal::new(0.0, l).unwrap()
-}
-
-pub fn rot_brownian_distr(d_diff: f64, dt: f64) -> Normal<f64> {
-    let l = (2.0 * d_diff * dt).sqrt();
-    Normal::new(0.0, l).unwrap()
+pub fn brownian_distr(d_diff: f64, dt: f64) -> Normal<f64> {
+    Normal::new(0.0, (2.0 * d_diff * dt).sqrt()).unwrap()
 }
 
 pub fn random_rotation(

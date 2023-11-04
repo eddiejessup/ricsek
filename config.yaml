@@ -2,32 +2,37 @@ parameters:
   type: Physical
   dt: 0.001
   boundaries:
-    - l: 80e-6
+    - l: 80
       closed: true
-    - l: 20e-6
+    - l: 20
       closed: true
-    - l: 20e-6
+    - l: 20
       closed: true
   singularities: []
     # - point: [0.0, 0.0, 0.0]
     #   params:
     #     type: Rotlet
-    #     c: [0.0, 1.0e-24, 0.0]
-  object_stiffness: 1e1
-  fluid_temperature: 300.0
-  fluid_viscosity: 0.001
-  agent_radius: 0.5e-6
-  agent_length: 4.0e-6
-  agent_linear_spring_stiffness: 1.0e-6
-  agent_propulsion_force: 0.5e-12
+    #     c: [0.0, 1.0, 0.0]
+  object_stiffness: 1e-5
+  fluid_temperature: 0.0
+  fluid_viscosity: 1e-9
+  agent_radius: 0.5
+  agent_length: 4.0
+  agent_propulsion_force: 0.5e-6
 agent_initialization:
   - type: RandomUniformByNumber
-    number: 1000
-  # - type: Explicit
-  #   agents:
-  #     - r: [-9.0e-6, +0.01e-6, +0.0e-6]
-  #       u: [+1.0   , +0.0   , +0.0   ]
-  #     - r: [+9.0e-6, +0.0e-6, +0.0e-6]
-  #       u: [-1.0   , +0.0   , +0.0   ]
+    number: 100
   # - type: RandomUniformByVolumeNumberDensity
   #   volume_number_density: 0.01e17
+  # - type: Explicit
+  #   agents:
+  #     - r: [-9.0, +0.01, +0.0   ]
+  #       u: [+1.0   , +0.0   ,  +0.0   ]
+  #     - r: [+9.0, +0.0   ,  +0.0   ]
+  #       u: [-1.0   , +0.0   ,  +0.0   ]
+  # - type: Explicit
+  #   agents:
+  #     - r: [-9.0, +0.0, +0.0]
+  #       u: [+1.0   , +0.1   , +0.0   ]
+  #     - r: [-9.0, +3.0, +0.0]
+  #       u: [+1.0   , +0.0   , +0.0   ]

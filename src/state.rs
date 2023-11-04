@@ -1,10 +1,7 @@
 use log::debug;
 use nalgebra::{Point3, UnitVector3, Vector3};
 
-use crate::geometry::{
-    capsule::capsule_bounding_box,
-    line_segment::{BoundingBox, LineSegment},
-};
+use crate::geometry::line_segment::LineSegment;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AgentStepSummary {
@@ -62,10 +59,6 @@ impl Agent {
 
     pub fn u(&self) -> UnitVector3<f64> {
         self.seg.u_start_end()
-    }
-
-    pub fn bounding_box(&self, radius: f64) -> BoundingBox {
-        capsule_bounding_box(&self.seg, radius)
     }
 
     pub fn r1_stretch_force(&self, d0: f64, k: f64) -> Vector3<f64> {

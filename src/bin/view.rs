@@ -54,7 +54,7 @@ pub fn add_agents(
     );
     let rod_mesh = meshes.add(
         shape::Cylinder {
-            radius: env.transform_coord(0.1e-6),
+            radius: env.transform_coord(0.1),
             height: env.transform_coord(config.parameters.agent_inter_sphere_length),
             resolution: 18,
             segments: 1,
@@ -127,36 +127,40 @@ fn update_agent_points(
         let agent = &cur_sim_state.agents[agent_id.0];
         *transform = Transform::from_translation(env.transformed_vec3(agent.seg.centroid()));
 
+        let f_coeff = 1e6;
+        let torque_coeff = 1e6;
+        let v_coeff = 1e-2;
+
         if let Some(agent_summaries) = opt_summary {
             let agent_summary = &agent_summaries[agent_id.0];
             *vector_set = flow::VectorSet(vec![
                 (
                     flow::VectorLabel("f_agent_electro".to_string()),
-                    agent_summary.f_agent_electro,
+                    f_coeff * agent_summary.f_agent_electro,
                 ),
                 (
                     flow::VectorLabel("torque_agent_electro".to_string()),
-                    1e6 * agent_summary.torque_agent_electro,
+                    torque_coeff * agent_summary.torque_agent_electro,
                 ),
                 (
                     flow::VectorLabel("f_propulsion".to_string()),
-                    agent_summary.f_propulsion,
+                    f_coeff * agent_summary.f_propulsion,
                 ),
                 (
                     flow::VectorLabel("f_boundary_electro".to_string()),
-                    agent_summary.f_boundary_electro,
+                    f_coeff * agent_summary.f_boundary_electro,
                 ),
                 (
                     flow::VectorLabel("torque_boundary_electro".to_string()),
-                    1e6 * agent_summary.torque_boundary_electro,
+                    torque_coeff * agent_summary.torque_boundary_electro,
                 ),
                 (
                     flow::VectorLabel("v_fluid_back".to_string()),
-                    1e-6 * agent_summary.v_fluid_back,
+                    v_coeff * agent_summary.v_fluid_back,
                 ),
                 (
                     flow::VectorLabel("v_fluid_front".to_string()),
-                    1e-6 * agent_summary.v_fluid_front,
+                    v_coeff * agent_summary.v_fluid_front,
                 ),
             ])
         }
@@ -259,8 +263,8 @@ fn main() {
 
     let env = Environment {
         boundaries: setup.parameters.boundaries.clone(),
-        arrow_length: 2.0e-6,
-        length_factor: 1e6,
+        arrow_length: 2.0,
+        length_factor: 1.0,
     };
 
     info!("Got {} sim-states", sim_states.len());
@@ -282,7 +286,7 @@ fn main() {
         .insert_resource(env)
         .insert_resource(SimStates(sim_states))
         .insert_resource(SetupRes(setup))
-        .insert_resource(FlowViewState::new(10000))
+        .insert_resource(FlowViewState::new(10000, 0.0))
         .insert_resource(ViewState::default())
         .add_systems(Startup, add_camera)
         .add_systems(Startup, add_axis_arrows)

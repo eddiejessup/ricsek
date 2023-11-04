@@ -18,13 +18,15 @@ pub struct FlowVector;
 pub struct FlowViewState {
     pub singularity_status: [bool; 9],
     pub n_samples: usize,
+    pub threshold: f64,
 }
 
 impl FlowViewState {
-    pub fn new(n_samples: usize) -> Self {
+    pub fn new(n_samples: usize, threshold: f64) -> Self {
         Self {
             singularity_status: [false; 9],
             n_samples,
+            threshold,
         }
     }
 }
@@ -40,7 +42,7 @@ pub fn add_flow(
     commands.spawn(TextBundle::from_section(
         "Hello, Bevy!",
         TextStyle {
-            font: asset_server.load("/Users/elliotmarsden/Library/Fonts/FiraCode-Medium.ttf"),
+            font: asset_server.load("fonts/Inconsolata/Inconsolata-Regular.ttf"),
             font_size: 40.0,
             color: Color::PURPLE,
         },
@@ -97,33 +99,28 @@ pub fn update_flow(
         })
         .collect();
 
-    let may_label: Option<String> = match net_vs.get(0) {
-        Some((labels, _)) => Some(
-            labels
-                .iter()
-                .map(|s| s.clone().0)
-                .collect::<Vec<String>>()
-                .join(", "),
-        ),
-        None => None,
-    };
-    let mut text = q_text.get_single_mut().unwrap();
-    text.sections[0].value = match may_label {
-        Some(label) => format!("Flow vector: {}", &label),
-        None => "Flow vector: None".to_string(),
-    };
+    // First ten velocities
+    // println!("net_vs: {:?}", &net_vs[0..10]);
 
-    let v_max_scale = 1e-12;
+    let mut text = q_text.get_single_mut().unwrap();
+    text.sections[0].value = format!("Flow vector: {}", match net_vs.get(0) {
+      Some((labels, _)) => labels
+      .iter()
+      .map(|s| s.clone().0)
+      .collect::<Vec<String>>()
+      .join(", "),
+      None => "None".to_string(),
+    });
+
+    let v_max_scale = 1.0;
 
     // Iterate over markers.
     for (i, (_vs, vset_children)) in q_vectorset.iter().enumerate() {
         // Get the selected flow vector.
         let v = net_vs[i].1;
 
-        // Map the flow vector to a magnitude in [0.0, 1.0] normalized on the
-        // max vector, on a log scale.
+        // Map the flow vector to a magnitude in [0.0, 1.0].
         let mag_scale = (v.magnitude() / v_max_scale).min(1.0);
-        // Map normalized vector to a point on the color spectrum.
 
         // Set the scale of the arrow somewhere between 0 and env.arrow_length based on mag_scale value.
         let arrow_scale = mag_scale * env.arrow_length;
@@ -135,7 +132,7 @@ pub fn update_flow(
             };
 
             // If the flow vector is too small, hide it.
-            *visibility = if mag_scale < 0.05 {
+            *visibility = if mag_scale < flow_view_state.threshold {
                 Visibility::Hidden
             } else {
                 Visibility::Visible
@@ -145,7 +142,6 @@ pub fn update_flow(
             match nalgebra_to_glam_vec(&v).try_normalize() {
                 Some(glam_u) => {
                     *transform =
-                        // Transform::from_scale(Vec3::splat(env.transform_coord(env.arrow_length)))
                         Transform::from_scale(Vec3::splat(env.transform_coord(arrow_scale)))
                             .looking_to(glam_u, Vec3::Z)
                 }

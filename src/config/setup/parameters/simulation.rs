@@ -10,9 +10,9 @@ pub struct SimParams {
     // Agent shape.
     pub agent_radius: f64,
     pub agent_inter_sphere_length: f64,
-    pub agent_linear_spring_stiffness: f64,
     // Agent propulsion.
     pub agent_propulsion_force: f64,
+    pub agent_propulsive_stokeslet_strength: f64,
     // Agent thermal noise.
     pub agent_translational_diffusion_coefficient: f64,
     pub agent_rotational_diffusion_coefficient: f64,
