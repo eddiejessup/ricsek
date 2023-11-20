@@ -3,20 +3,18 @@ use std::f64::consts::PI;
 use log::info;
 use nalgebra::{DMatrix, DVector, Point3, UnitVector3, Vector3};
 use ricsek::{
-    config::setup::parameters::common::{AxisBoundaryConfig, BoundaryConfig},
     geometry::line_segment::BoundingBox,
-    view::{common::spawn_arrow, environment::Environment},
+    view::{
+        common::{add_axis_arrows, point3_to_gvec3, spawn_arrow, vec3_to_gvec3},
+        environment::Environment,
+        pan_orbit_camera::{add_camera, pan_orbit_camera_update},
+        *,
+    },
 };
 use tobj::{self, LoadOptions};
 
 use bevy::prelude::*;
 use bevy_obj::ObjPlugin;
-
-use ricsek::view::{
-    common::{add_axis_arrows, nalgebra_to_glam_vec},
-    pan_orbit_camera::{add_camera, pan_orbit_camera_update},
-    *,
-};
 
 #[derive(Debug, Clone)]
 pub struct Triangle {
@@ -31,7 +29,6 @@ pub struct TriangleSet {
     pub triangles: Vec<(Triangle, Vector3<f64>)>,
 }
 
-const LENGTH_FACTOR: f64 = 1.0;
 // const MESH_PATH: &str = "meshes/plane_10x10.obj";
 // const MESH_PATH: &str = "meshes/sphere.obj";
 // const MESH_PATH: &str = "meshes/sphere_5seg.obj";
@@ -76,10 +73,7 @@ impl Triangle {
     }
 }
 
-fn read_triangle_mesh(
-    path: &str,
-    length_factor: f64,
-) -> (Vec<Point3<f64>>, Vec<Point3<usize>>, Vec<Triangle>) {
+fn read_triangle_mesh(path: &str) -> (Vec<Point3<f64>>, Vec<Point3<usize>>, Vec<Triangle>) {
     let (models, _) = tobj::load_obj(
         path,
         &LoadOptions {
@@ -112,13 +106,11 @@ fn read_triangle_mesh(
     // Traverse the vertices
     for vx_ix in 0..(vertex_positions.len() / 3) {
         let vx_pos_ix = 3 * vx_ix;
-        vertices.push(
-            Point3::new(
-                vertex_positions[vx_pos_ix] as f64,
-                vertex_positions[vx_pos_ix + 1] as f64,
-                vertex_positions[vx_pos_ix + 2] as f64,
-            ) * length_factor,
-        );
+        vertices.push(Point3::new(
+            vertex_positions[vx_pos_ix] as f64,
+            vertex_positions[vx_pos_ix + 1] as f64,
+            vertex_positions[vx_pos_ix + 2] as f64,
+        ));
     }
 
     let vx_position_indices = &mesh.indices;
@@ -179,13 +171,13 @@ fn add_mesh(
         let normal = face.normal();
 
         // Normal.
-        match nalgebra_to_glam_vec(&normal.into_inner()).try_normalize() {
+        match vec3_to_gvec3(&normal.into_inner()).try_normalize() {
             Some(glam_u) => {
                 // Normal.
                 commands
                     .spawn(SpatialBundle {
-                        transform: Transform::from_translation(env.transformed_vec3(centroid))
-                            .with_scale(Vec3::splat(env.transform_coord(env.arrow_length * g)))
+                        transform: Transform::from_translation(point3_to_gvec3(&centroid))
+                            .with_scale(Vec3::splat((env.arrow_length * g) as f32))
                             .looking_to(glam_u, Vec3::Z),
                         ..default()
                     })
@@ -197,16 +189,14 @@ fn add_mesh(
         };
 
         // Vector value.
-        match nalgebra_to_glam_vec(&value).try_normalize() {
+        match vec3_to_gvec3(&value).try_normalize() {
             Some(glam_u) => {
                 // Normal.
                 let v_mag = value.norm() / v_mag_max;
                 commands
                     .spawn(SpatialBundle {
-                        transform: Transform::from_translation(env.transformed_vec3(centroid))
-                            .with_scale(Vec3::splat(
-                                env.transform_coord(env.arrow_length * f * v_mag),
-                            ))
+                        transform: Transform::from_translation(point3_to_gvec3(&centroid))
+                            .with_scale(Vec3::splat((env.arrow_length * f * v_mag) as f32))
                             .looking_to(glam_u, Vec3::Z),
                         ..default()
                     })
@@ -224,7 +214,7 @@ fn main() {
 
     info!("Loading mesh");
     let (_mesh_vertices, _mesh_face_ixs, mesh_faces) =
-        read_triangle_mesh(&format!("{}/{}", "assets", MESH_PATH), LENGTH_FACTOR);
+        read_triangle_mesh(&format!("{}/{}", "assets", MESH_PATH));
     // let mut triangles_wtr = csv::Writer::from_path("triangles.csv").unwrap();
     // for face_ix in mesh_face_ixs {
     //     triangles_wtr
@@ -252,7 +242,7 @@ fn main() {
     info!("Creating matrix");
     let n_components = 3;
     let v_axis = 1;
-    let v_mag = 1.0 * LENGTH_FACTOR;
+    let v_mag = 1.0;
 
     let mut v_inf = DVector::repeat(n_components, 0.0);
     v_inf[v_axis] = v_mag;
@@ -261,9 +251,9 @@ fn main() {
 
     let mut vels_desired = Vec::new();
     for _ in 0..mesh_faces.len() {
-      for j in 0..n_components {
-        vels_desired.push(-v_inf[j]);
-      }
+        for j in 0..n_components {
+            vels_desired.push(-v_inf[j]);
+        }
     }
 
     let n_eqns = n_components * mesh_faces.len();
@@ -272,7 +262,7 @@ fn main() {
     // let viscosity = 0.1;
     let global_g_coeff = 1.0 / (8.0 * PI * viscosity);
     // let global_t_coeff = 1.0 / (8.0 * PI);
-    let radius = 1.0 * LENGTH_FACTOR;
+    let radius = 1.0;
 
     let mut stress_ideal = DVector::repeat(n_components, 0.0);
     stress_ideal[v_axis] = -(3.0 / 2.0) * viscosity * v_mag / radius;
@@ -310,7 +300,7 @@ fn main() {
             }
         }
         for j in 0..n_components {
-          elem_stresses_ideal.push(stress_ideal[j]);
+            elem_stresses_ideal.push(stress_ideal[j]);
         }
     }
     let vels_desired = DVector::from_vec(vels_desired);
@@ -334,10 +324,10 @@ fn main() {
     for i in 0..mesh_faces.len() {
         let mut elem_stress_vec = Vec::new();
         for j in 0..n_components {
-          elem_stress_vec.push(elem_stresses_computed[n_components * i + j]);
+            elem_stress_vec.push(elem_stresses_computed[n_components * i + j]);
         }
         for _ in n_components..3 {
-          elem_stress_vec.push(0.0);
+            elem_stress_vec.push(0.0);
         }
         stresses.push(DVector::from_vec(elem_stress_vec));
     }
@@ -370,18 +360,16 @@ fn main() {
 
     let mut stress_wtr = csv::Writer::from_path("stresses.csv").unwrap();
     for stress in stresses.clone() {
-      let mut record = Vec::new();
-      for j in 0..n_components {
-        record.push(stress[j].to_string());
-      }
-      record.push(stress.norm().to_string());
-      for j in 0..n_components {
-        record.push(stress_ideal[j].to_string());
-      }
-      record.push(stress_ideal.norm().to_string());
-        stress_wtr
-            .write_record(&record)
-            .unwrap();
+        let mut record = Vec::new();
+        for j in 0..n_components {
+            record.push(stress[j].to_string());
+        }
+        record.push(stress.norm().to_string());
+        for j in 0..n_components {
+            record.push(stress_ideal[j].to_string());
+        }
+        record.push(stress_ideal.norm().to_string());
+        stress_wtr.write_record(&record).unwrap();
     }
     stress_wtr.flush().unwrap();
 
@@ -401,22 +389,8 @@ fn main() {
 
     info!("Drawing");
     let env = Environment {
-        boundaries: BoundaryConfig(Vector3::new(
-            AxisBoundaryConfig {
-                l: 2.0 * LENGTH_FACTOR,
-                closed: true,
-            },
-            AxisBoundaryConfig {
-                l: 2.0 * LENGTH_FACTOR,
-                closed: true,
-            },
-            AxisBoundaryConfig {
-                l: 2.0 * LENGTH_FACTOR,
-                closed: true,
-            },
-        )),
-        arrow_length: 0.025 * LENGTH_FACTOR,
-        length_factor: 1.0 / LENGTH_FACTOR,
+        boundaries: None,
+        arrow_length: 0.025,
     };
 
     // Zip mesh_faces with stresses.
@@ -432,7 +406,7 @@ fn main() {
         .insert_resource(env)
         .insert_resource(TriangleSet { triangles })
         .add_systems(Startup, add_camera)
-        .add_systems(Startup, environment::add_environment)
+        .add_systems(Startup, environment::add_boundaries)
         .add_systems(Startup, add_axis_arrows)
         .add_systems(Startup, add_mesh)
         .add_systems(Update, pan_orbit_camera_update)

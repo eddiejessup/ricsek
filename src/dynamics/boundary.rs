@@ -75,22 +75,6 @@ pub fn pairwise_dist(
         .collect()
 }
 
-// pub fn pairwise_agent_dist(
-//     a: &Agent,
-//     ags: &[Agent],
-//     boundaries: &BoundaryConfig,
-// ) -> Vec<Vector3<f64>> {
-//     ags.iter()
-//         .map(|a2| {
-//             let (r_close_1, r_close_2) = a.seg.closest_point_on_line_segment(&a2.seg);
-//             debug!("r_close_1: {}, r_close_2: {}", 1e6*r_close_1, 1e6*r_close_2);
-//             let mut dr = r_close_2 - r_close_1;
-//             wrap_vec_inplace(dr, &mut dr, boundaries);
-//             dr
-//         })
-//         .collect()
-// }
-
 pub fn boundary_electro(
     a: &Agent,
     agent_radius: f64,

@@ -8,7 +8,7 @@ use ricsek::{
         singularities::{Singularity, SingularityParams},
     },
     view::{
-        common::add_axis_arrows,
+        common::{add_axis_arrows, point3_to_gvec3},
         flow::{add_flow, update_flow, FlowViewState},
         pan_orbit_camera::{add_camera, pan_orbit_camera_update},
         *,
@@ -30,7 +30,6 @@ pub struct SingularitySet(pub Vec<(flow::VectorLabel, Singularity)>);
 pub fn add_flow_markers(
     mut commands: Commands,
     markers: Res<MarkerSet>,
-    env: Res<environment::Environment>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -43,7 +42,7 @@ pub fn add_flow_markers(
             PbrBundle {
                 mesh: cube.clone(),
                 material: red.clone(),
-                transform: Transform::from_translation(env.transformed_vec3(sample.r)),
+                transform: Transform::from_translation(point3_to_gvec3(&sample.r)),
                 ..default()
             },
             sample.vs.clone(),
@@ -54,7 +53,6 @@ pub fn add_flow_markers(
 pub fn add_singularities(
     mut commands: Commands,
     singularities: Res<SingularitySet>,
-    env: Res<environment::Environment>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -68,7 +66,7 @@ pub fn add_singularities(
             PbrBundle {
                 mesh: mesh_handle.clone(),
                 material: material_handle.clone(),
-                transform: Transform::from_translation(env.transformed_vec3(sing.point)),
+                transform: Transform::from_translation(point3_to_gvec3(&sing.point)),
                 ..default()
             },
             label.clone(),
@@ -103,24 +101,24 @@ fn stokeslet_mirror(
 }
 
 fn main() {
-  env_logger::init();
-  let env = environment::Environment {
-        boundaries: BoundaryConfig(Vector3::new(
-            AxisBoundaryConfig {
-                l: 200.0,
-                closed: true,
-            },
-            AxisBoundaryConfig {
-                l: 200.0,
-                closed: true,
-            },
-            AxisBoundaryConfig {
-                l: 200.0,
-                closed: true,
-            },
-        )),
+    env_logger::init();
+    let bc = BoundaryConfig(Vector3::new(
+        AxisBoundaryConfig {
+            l: 200.0,
+            closed: true,
+        },
+        AxisBoundaryConfig {
+            l: 200.0,
+            closed: true,
+        },
+        AxisBoundaryConfig {
+            l: 200.0,
+            closed: true,
+        },
+    ));
+    let env = environment::Environment {
+        boundaries: Some(bc.clone()),
         arrow_length: 2.0,
-        length_factor: 1.0,
     };
 
     let mut sample_rs = Vec::new();
@@ -128,8 +126,8 @@ fn main() {
     //     sample_rs.push(p);
     // }
 
-    let sample_l = nalgebra::Vector2::new(env.boundaries.l().x, env.boundaries.l().y);
-    let sample_z = env.boundaries.l_half().z;
+    let sample_l = nalgebra::Vector2::new(bc.l().x, bc.l().y);
+    let sample_z = bc.l_half().z;
     let step = 10.0;
     for p in ricsek::geometry::grid_2d(sample_l, step) {
         sample_rs.push(Point3::new(p.x, p.y, sample_z));
@@ -143,7 +141,7 @@ fn main() {
         point: stokeslet_origin_point,
         params: SingularityParams::Stokeslet { a: stokeslet_force },
     };
-    let d = Vector3::new(0.0, 0.0, env.boundaries.0.z.l_half());
+    let d = Vector3::new(0.0, 0.0, bc.0.z.l_half());
 
     // let stokeslet_mirror_point = stokeslet_origin.point + Vector3::new(0.0, 0.0, 2.0 * h);
     // let stokeslet_mirror = Singularity {
@@ -168,10 +166,8 @@ fn main() {
     //     },
     // };
 
-    let mut singularities: Vec<(flow::VectorLabel, Singularity)> = vec![(
-        flow::VectorLabel(String::from("Origin")),
-        stokeslet_origin,
-    )];
+    let mut singularities: Vec<(flow::VectorLabel, Singularity)> =
+        vec![(flow::VectorLabel(String::from("Origin")), stokeslet_origin)];
 
     singularities.extend(
         stokeslet_mirror(stokeslet_origin_point, d, stokeslet_force)
@@ -247,14 +243,13 @@ fn main() {
             ),
         })
         .collect();
-    let n_samples = markers.len();
 
     App::new()
         .add_plugins(DefaultPlugins)
         .insert_resource(env)
         .insert_resource(MarkerSet(markers))
         .insert_resource(SingularitySet(singularities))
-        .insert_resource(FlowViewState::new(n_samples, 0.05))
+        .insert_resource(FlowViewState::new(0.05))
         .add_systems(
             Startup,
             (
@@ -265,7 +260,7 @@ fn main() {
             ),
         )
         .add_systems(PostStartup, add_flow)
-        .add_systems(Startup, environment::add_environment)
+        .add_systems(Startup, environment::add_boundaries)
         .add_systems(Update, pan_orbit_camera_update)
         .add_systems(
             Update,

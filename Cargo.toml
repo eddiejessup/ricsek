@@ -47,7 +47,7 @@ bindgen = "0.65"
 name = "run"
 
 [[bin]]
-name = "view"
+name = "view_sim"
 
 [[bin]]
 name = "view_stokes_solutions"

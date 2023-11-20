@@ -1,48 +1,24 @@
 use crate::config::setup::parameters::common::BoundaryConfig;
 use bevy::prelude::*;
-use nalgebra::Point3;
 
 #[derive(Resource)]
 pub struct Environment {
-    pub boundaries: BoundaryConfig,
+    pub boundaries: Option<BoundaryConfig>,
     pub arrow_length: f64,
-    pub length_factor: f64,
 }
 
-impl Environment {
-    pub fn transform_coord(&self, sd: f64) -> f32 {
-        (sd * self.length_factor) as f32
-    }
-
-    pub fn invert_coord(&self, sd: f32) -> f64 {
-        sd as f64 / self.length_factor
-    }
-
-    pub fn transformed_vec3(&self, sd: Point3<f64>) -> Vec3 {
-        let st = sd.map(|x| self.transform_coord(x));
-        Vec3::new(st.x, st.y, st.z)
-    }
-
-    pub fn transformed_l(&self) -> Vec3 {
-        self.transformed_vec3(self.boundaries.l().into())
-    }
-
-    pub fn inverted_vec3(&self, sd: Vec3) -> Point3<f64> {
-        Point3::new(
-            self.invert_coord(sd.x),
-            self.invert_coord(sd.y),
-            self.invert_coord(sd.z),
-        )
-    }
-}
-
-pub fn add_environment(
+pub fn add_boundaries(
     mut commands: Commands,
     env: Res<Environment>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let l = env.transformed_l();
+    let b = match &env.boundaries {
+        None => return,
+        Some(b) => b,
+    };
+
+    let l = b.l();
     // Need 6 rectangles, 2 for each boundary of the environment.
     // For the boundary along x, the rectangle should have width l.y and height l.z
     // And should be centred at (l.x / 2, 0, 0) and (-l.x / 2, 0, 0)
@@ -57,7 +33,7 @@ pub fn add_environment(
             },
             Vec3::X,
             l.x,
-            env.boundaries.0.x.closed,
+            b.0.x.closed,
             Vec3::Y,
         ),
         (
@@ -67,7 +43,7 @@ pub fn add_environment(
             },
             Vec3::Y,
             l.y,
-            env.boundaries.0.y.closed,
+            b.0.y.closed,
             Vec3::X,
         ),
         (
@@ -77,7 +53,7 @@ pub fn add_environment(
             },
             Vec3::Z,
             l.z,
-            env.boundaries.0.y.closed,
+            b.0.y.closed,
             Vec3::Y,
         ),
     ];
@@ -91,7 +67,7 @@ pub fn add_environment(
                 } else {
                     Color::YELLOW
                 })),
-                transform: Transform::from_translation(axis * (sgn as f32) * axis_l / 2.0 as f32)
+                transform: Transform::from_translation(axis * (sgn as f32) * axis_l as f32 / 2.0)
                     .looking_to(axis * sgn as f32, up),
                 ..default()
             },));

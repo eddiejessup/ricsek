@@ -1,10 +1,14 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
-use nalgebra::Vector3;
+use nalgebra::{Vector3, Point3};
 
-pub fn nalgebra_to_glam_vec(v: &Vector3<f64>) -> Vec3 {
+pub fn vec3_to_gvec3(v: &Vector3<f64>) -> Vec3 {
     Vec3::new(v.x as f32, v.y as f32, v.z as f32)
+}
+
+pub fn point3_to_gvec3(v: &Point3<f64>) -> Vec3 {
+    vec3_to_gvec3(&v.coords)
 }
 
 pub fn increment_step(cur_i: usize, backward: bool, maxi: usize, stepsize: usize) -> usize {

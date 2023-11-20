@@ -9,7 +9,7 @@ use bevy::{
 };
 use nalgebra::Point3;
 use ricsek::view::{
-    common::{add_axis_arrows, nalgebra_to_glam_vec},
+    common::{add_axis_arrows, point3_to_gvec3, vec3_to_gvec3},
     environment::Environment,
     flow::FlowViewState,
     pan_orbit_camera::{add_camera, pan_orbit_camera_update},
@@ -27,7 +27,6 @@ pub enum AgentBodyComponent {
 pub fn add_agents(
     mut commands: Commands,
     sim_states: Res<SimStates>,
-    env: Res<environment::Environment>,
     config: Res<SetupRes>,
     view_state: Res<ViewState>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -46,7 +45,7 @@ pub fn add_agents(
 
     let sphere_mesh = meshes.add(
         shape::UVSphere {
-            radius: env.transform_coord(radius),
+            radius: radius as f32,
             sectors: 18,
             stacks: 9,
         }
@@ -54,8 +53,8 @@ pub fn add_agents(
     );
     let rod_mesh = meshes.add(
         shape::Cylinder {
-            radius: env.transform_coord(0.1),
-            height: env.transform_coord(config.parameters.agent_inter_sphere_length),
+            radius: 0.1,
+            height: config.parameters.agent_inter_sphere_length as f32,
             resolution: 18,
             segments: 1,
         }
@@ -110,7 +109,6 @@ pub fn add_agents(
 
 fn update_agent_points(
     sim_states: Res<SimStates>,
-    env: Res<Environment>,
     view_state: Res<ViewState>,
     mut q_point: Query<(&AgentId, &mut flow::VectorSet, &mut Transform)>,
 ) {
@@ -125,7 +123,7 @@ fn update_agent_points(
     debug!("Updating positions for agents, to view_i: {}", view_i);
     for (agent_id, mut vector_set, mut transform) in &mut q_point {
         let agent = &cur_sim_state.agents[agent_id.0];
-        *transform = Transform::from_translation(env.transformed_vec3(agent.seg.centroid()));
+        *transform = Transform::from_translation(point3_to_gvec3(&agent.seg.centroid()));
 
         let f_coeff = 1e6;
         let torque_coeff = 1e6;
@@ -168,7 +166,6 @@ fn update_agent_points(
 }
 
 fn update_agent_orientations(
-    env: Res<Environment>,
     sim_states: Res<SimStates>,
     view_state: Res<ViewState>,
     mut q_ag: Query<(&AgentId, &mut Transform, &AgentBodyComponent)>,
@@ -179,16 +176,17 @@ fn update_agent_orientations(
     for (agent_id, mut transform, agent_body) in &mut q_ag {
         let agent = &cur_sim_state.agents[agent_id.0];
         *transform = match agent_body {
-            AgentBodyComponent::Front => Transform::from_translation(
-                env.transformed_vec3(Point3::origin() + agent.seg.start_end() * 0.5),
-            )
-            .looking_to(nalgebra_to_glam_vec(&agent.seg.start_end()), Vec3::Z),
-            AgentBodyComponent::Back => Transform::from_translation(
-                env.transformed_vec3(Point3::origin() - agent.seg.start_end() * 0.5),
-            )
-            .looking_to(nalgebra_to_glam_vec(&agent.seg.start_end()), Vec3::Z),
-            AgentBodyComponent::Rod => Transform::IDENTITY
-                .looking_to(nalgebra_to_glam_vec(&agent.seg.start_end()), Vec3::Z),
+            AgentBodyComponent::Front => Transform::from_translation(point3_to_gvec3(
+                &(Point3::origin() + agent.seg.start_end() * 0.5),
+            ))
+            .looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z),
+            AgentBodyComponent::Back => Transform::from_translation(point3_to_gvec3(
+                &(Point3::origin() - agent.seg.start_end() * 0.5),
+            ))
+            .looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z),
+            AgentBodyComponent::Rod => {
+                Transform::IDENTITY.looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z)
+            }
         }
     }
 }
@@ -262,9 +260,8 @@ fn main() {
     let sim_states = ricsek::db::read_run_sim_states(conn, run_id);
 
     let env = Environment {
-        boundaries: setup.parameters.boundaries.clone(),
+        boundaries: Some(setup.parameters.boundaries.clone()),
         arrow_length: 2.0,
-        length_factor: 1.0,
     };
 
     info!("Got {} sim-states", sim_states.len());
@@ -286,12 +283,12 @@ fn main() {
         .insert_resource(env)
         .insert_resource(SimStates(sim_states))
         .insert_resource(SetupRes(setup))
-        .insert_resource(FlowViewState::new(10000, 0.0))
+        .insert_resource(FlowViewState::new(0.0))
         .insert_resource(ViewState::default())
         .add_systems(Startup, add_camera)
         .add_systems(Startup, add_axis_arrows)
         .add_systems(Startup, add_agents)
-        .add_systems(Startup, environment::add_environment)
+        .add_systems(Startup, environment::add_boundaries)
         .add_systems(PostStartup, flow::add_flow)
         .add_systems(Update, pan_orbit_camera_update)
         .add_systems(

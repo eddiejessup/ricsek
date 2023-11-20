@@ -1,7 +1,7 @@
 use bevy::{prelude::*, render::view::visibility::Visibility};
 use nalgebra::Vector3;
 
-use crate::view::common::nalgebra_to_glam_vec;
+use crate::view::common::vec3_to_gvec3;
 
 use super::{environment::Environment, common::spawn_arrow};
 
@@ -16,16 +16,14 @@ pub struct FlowVector;
 
 #[derive(Resource)]
 pub struct FlowViewState {
-    pub singularity_status: [bool; 9],
-    pub n_samples: usize,
+    pub vector_statuses: [bool; 9],
     pub threshold: f64,
 }
 
 impl FlowViewState {
-    pub fn new(n_samples: usize, threshold: f64) -> Self {
+    pub fn new(threshold: f64) -> Self {
         Self {
-            singularity_status: [false; 9],
-            n_samples,
+            vector_statuses: [false; 9],
             threshold,
         }
     }
@@ -72,7 +70,7 @@ pub fn update_flow(
     mut q_flow_vectors: Query<(&mut Transform, &mut Visibility), With<FlowVector>>,
     mut q_text: Query<&mut Text>,
 ) {
-    let net_vs: Vec<(Vec<VectorLabel>, Vector3<f64>)> = q_vectorset
+    let net_vs_and_labels: Vec<(Vec<VectorLabel>, Vector3<f64>)> = q_vectorset
         .iter()
         .map(|(vset, _children)| {
             // Keep the set of vectors that are enabled according to flow_view_state.
@@ -81,7 +79,7 @@ pub fn update_flow(
                 .iter()
                 .enumerate()
                 .filter_map(|(i, x)| {
-                    if flow_view_state.singularity_status[i] {
+                    if flow_view_state.vector_statuses[i] {
                         Some(x.clone())
                     } else {
                         None
@@ -99,11 +97,8 @@ pub fn update_flow(
         })
         .collect();
 
-    // First ten velocities
-    // println!("net_vs: {:?}", &net_vs[0..10]);
-
     let mut text = q_text.get_single_mut().unwrap();
-    text.sections[0].value = format!("Flow vector: {}", match net_vs.get(0) {
+    text.sections[0].value = format!("Flow vector: {}", match net_vs_and_labels.get(0) {
       Some((labels, _)) => labels
       .iter()
       .map(|s| s.clone().0)
@@ -117,7 +112,7 @@ pub fn update_flow(
     // Iterate over markers.
     for (i, (_vs, vset_children)) in q_vectorset.iter().enumerate() {
         // Get the selected flow vector.
-        let v = net_vs[i].1;
+        let v = net_vs_and_labels[i].1;
 
         // Map the flow vector to a magnitude in [0.0, 1.0].
         let mag_scale = (v.magnitude() / v_max_scale).min(1.0);
@@ -139,10 +134,10 @@ pub fn update_flow(
             };
 
             // Set the orientation of the overall flow-vector.
-            match nalgebra_to_glam_vec(&v).try_normalize() {
+            match vec3_to_gvec3(&v).try_normalize() {
                 Some(glam_u) => {
                     *transform =
-                        Transform::from_scale(Vec3::splat(env.transform_coord(arrow_scale)))
+                        Transform::from_scale(Vec3::splat(arrow_scale as f32))
                             .looking_to(glam_u, Vec3::Z)
                 }
                 None => {
@@ -167,7 +162,7 @@ pub fn change_view(keyboard_input: Res<Input<KeyCode>>, mut view_state: ResMut<F
     ];
     for (keycode, ix) in entries {
         if keyboard_input.just_pressed(keycode) {
-            view_state.singularity_status[ix] = !view_state.singularity_status[ix];
+            view_state.vector_statuses[ix] = !view_state.vector_statuses[ix];
         }
     }
 }

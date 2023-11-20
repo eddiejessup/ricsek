@@ -125,11 +125,13 @@ fn get_window_size(window: &Window) -> Vec2 {
 pub fn add_camera(
     mut commands: Commands,
     env: Res<Environment>,
-    // mut wireframe_config: ResMut<WireframeConfig>,
 ) {
-    // wireframe_config.global = false;
+    let initial_z = match &env.boundaries {
+        None => 10.0,
+        Some(b) => b.l().max(),
+    };
 
-    let translation = Vec3::new(0.0, 0.0, env.transformed_l().max_element());
+    let translation = Vec3::new(0.0, 0.0, initial_z as f32);
     let radius = translation.length();
 
     commands.spawn((
