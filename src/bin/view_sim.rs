@@ -2,20 +2,47 @@ use std::{f32::consts::FRAC_PI_2, time::Duration};
 
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
-    pbr::wireframe::WireframePlugin,
     prelude::*,
-    render::{render_resource::WgpuFeatures, settings::WgpuSettings, RenderPlugin},
     time::common_conditions::on_timer,
 };
 use nalgebra::Point3;
-use ricsek::view::{
-    common::{add_axis_arrows, point3_to_gvec3, vec3_to_gvec3},
-    environment::Environment,
-    flow::FlowViewState,
-    pan_orbit_camera::{add_camera, pan_orbit_camera_update},
-    *,
+use ricsek::{
+    config::{run::RunContext, setup::parameters::simulation::SimParams},
+    dynamics::{StepSummary, run_steps},
+    state::SimState,
+    view::{
+        common::{add_axis_arrows, point3_to_gvec3, vec3_to_gvec3},
+        environment::Environment,
+        flow::FlowViewState,
+        pan_orbit_camera::{add_camera, pan_orbit_camera_update},
+        *,
+    },
 };
 use structopt::StructOpt;
+
+#[derive(Component)]
+pub struct AgentId(pub usize);
+
+#[derive(Resource)]
+pub struct SimViewState {
+    pub i: usize,
+    pub checkpoint_stepsize: usize,
+    pub sim_stepsize: usize
+}
+
+impl Default for SimViewState {
+    fn default() -> Self {
+        Self { i: 0, checkpoint_stepsize: 1, sim_stepsize: 10 }
+    }
+}
+
+impl SimViewState {}
+
+#[derive(Resource)]
+pub struct SimStates(pub Vec<(SimState, Option<StepSummary>)>);
+
+#[derive(Resource)]
+pub struct SimParamsRes(pub SimParams);
 
 #[derive(Component)]
 pub enum AgentBodyComponent {
@@ -27,17 +54,17 @@ pub enum AgentBodyComponent {
 pub fn add_agents(
     mut commands: Commands,
     sim_states: Res<SimStates>,
-    config: Res<SetupRes>,
-    view_state: Res<ViewState>,
+    params: Res<SimParamsRes>,
+    view_state: Res<SimViewState>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let view_i = view_state.i;
-    let cur_sim_state = &sim_states.0[view_i];
+    let (cur_sim_state, _) = &sim_states.0[view_i];
 
-    let config = &config.0;
+    let params = &params.0;
 
-    let radius = config.parameters.agent_radius;
+    let radius = params.agent_radius;
 
     let back_material = materials.add(StandardMaterial::from(Color::GREEN.with_a(0.9)));
     let front_material = materials.add(StandardMaterial::from(Color::RED.with_a(0.9)));
@@ -54,7 +81,7 @@ pub fn add_agents(
     let rod_mesh = meshes.add(
         shape::Cylinder {
             radius: 0.1,
-            height: config.parameters.agent_inter_sphere_length as f32,
+            height: params.agent_inter_sphere_length as f32,
             resolution: 18,
             segments: 1,
         }
@@ -109,16 +136,11 @@ pub fn add_agents(
 
 fn update_agent_points(
     sim_states: Res<SimStates>,
-    view_state: Res<ViewState>,
+    view_state: Res<SimViewState>,
     mut q_point: Query<(&AgentId, &mut flow::VectorSet, &mut Transform)>,
 ) {
     let view_i = view_state.i;
-    let cur_sim_state = &sim_states.0[view_i];
-    let opt_summary = &cur_sim_state.summary;
-    match opt_summary {
-        None => debug!("No agent summary for view_i: {}", view_i),
-        Some(_) => debug!("Agent summary for view_i: {}", view_i),
-    };
+    let (cur_sim_state, cur_step_summary) = &sim_states.0[view_i];
 
     debug!("Updating positions for agents, to view_i: {}", view_i);
     for (agent_id, mut vector_set, mut transform) in &mut q_point {
@@ -129,7 +151,7 @@ fn update_agent_points(
         let torque_coeff = 1e6;
         let v_coeff = 1e-2;
 
-        if let Some(agent_summaries) = opt_summary {
+        if let Some(StepSummary { agent_summaries }) = cur_step_summary {
             let agent_summary = &agent_summaries[agent_id.0];
             *vector_set = flow::VectorSet(vec![
                 (
@@ -167,11 +189,11 @@ fn update_agent_points(
 
 fn update_agent_orientations(
     sim_states: Res<SimStates>,
-    view_state: Res<ViewState>,
+    view_state: Res<SimViewState>,
     mut q_ag: Query<(&AgentId, &mut Transform, &AgentBodyComponent)>,
 ) {
     let view_i = view_state.i;
-    let cur_sim_state = &sim_states.0[view_i];
+    let (cur_sim_state, _) = &sim_states.0[view_i];
     debug!("Updating orientations for agents, to view_i: {}", view_i);
     for (agent_id, mut transform, agent_body) in &mut q_ag {
         let agent = &cur_sim_state.agents[agent_id.0];
@@ -193,8 +215,9 @@ fn update_agent_orientations(
 
 fn change_view(
     keyboard_input: Res<Input<KeyCode>>,
-    sim_states: Res<SimStates>,
-    mut view_state: ResMut<ViewState>,
+    params: Res<SimParamsRes>,
+    mut sim_states: ResMut<SimStates>,
+    mut view_state: ResMut<SimViewState>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Key0) {
         view_state.i = 0;
@@ -208,12 +231,31 @@ fn change_view(
     } else {
         None
     };
+
     if let Some(backward) = backward {
+        if !backward && view_state.i == sim_states.0.len() - 1 {
+            let mut final_state = (&sim_states.0[view_state.i]).0.clone();
+
+            let run_context = RunContext::new(&params.0, final_state.agents.len());
+            let rng = &mut rand::thread_rng();
+
+            let summary = run_steps(
+                &params.0,
+                &mut final_state,
+                &run_context,
+                rng,
+                view_state.sim_stepsize,
+            );
+
+            // Add the mutated state as a new sim-state.
+            sim_states.0.push((final_state, summary));
+        }
+
         view_state.i = common::increment_step(
             view_state.i,
             backward,
             sim_states.0.len() - 1,
-            view_state.stepsize,
+            view_state.checkpoint_stepsize,
         );
         return;
     }
@@ -226,8 +268,8 @@ fn change_view(
         None
     };
     if let Some(slowards) = slowards {
-        let new_step = view_state.stepsize as i64 + (if slowards { -1 } else { 1 });
-        view_state.stepsize = if new_step >= 1 { new_step as usize } else { 1 };
+        let new_step = view_state.checkpoint_stepsize as i64 + (if slowards { -1 } else { 1 });
+        view_state.checkpoint_stepsize = if new_step >= 1 { new_step as usize } else { 1 };
         return;
     }
 }
@@ -267,24 +309,16 @@ fn main() {
     info!("Got {} sim-states", sim_states.len());
 
     App::new()
-        .add_plugins((
-            DefaultPlugins.set(RenderPlugin {
-                wgpu_settings: WgpuSettings {
-                    features: WgpuFeatures::POLYGON_MODE_LINE,
-                    ..default()
-                },
-            }),
-            WireframePlugin,
-        ))
+        .add_plugins(DefaultPlugins)
         .add_plugins((
             LogDiagnosticsPlugin::default(),
             FrameTimeDiagnosticsPlugin::default(),
         ))
         .insert_resource(env)
         .insert_resource(SimStates(sim_states))
-        .insert_resource(SetupRes(setup))
+        .insert_resource(SimParamsRes(setup.parameters))
         .insert_resource(FlowViewState::new(0.0))
-        .insert_resource(ViewState::default())
+        .insert_resource(SimViewState::default())
         .add_systems(Startup, add_camera)
         .add_systems(Startup, add_axis_arrows)
         .add_systems(Startup, add_agents)

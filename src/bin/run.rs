@@ -1,6 +1,6 @@
 use log::{info, warn};
 use ricsek::{
-    config::{self, run::RunConfig},
+    config::{self, run::RunParams},
     dynamics::run,
     state::{Agent, SimState},
 };
@@ -77,7 +77,7 @@ fn main() {
         (run_id, config.parameters, sim_state)
     };
 
-    let run_config = RunConfig {
+    let run_config = RunParams {
         t_max: args.t_max,
         dstep_view: parameters.to_steps(args.dt_view),
         run_id,

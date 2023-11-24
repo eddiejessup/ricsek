@@ -12,7 +12,6 @@ diesel::table! {
         r2z -> Float8,
         th1 -> Float8,
         th2 -> Float8,
-        step_summary -> Nullable<Jsonb>,
     }
 }
 
@@ -22,6 +21,7 @@ diesel::table! {
         run_id -> Int4,
         step -> Int4,
         t -> Float8,
+        step_summary -> Nullable<Jsonb>,
     }
 }
 

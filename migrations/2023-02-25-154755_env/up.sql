@@ -3,6 +3,7 @@ CREATE TABLE env (
     run_id INTEGER NOT NULL REFERENCES run(id),
     step INTEGER NOT NULL,
     t FLOAT NOT NULL,
+    step_summary JSONB,
     UNIQUE (run_id, step)
 );
 
@@ -19,7 +20,6 @@ CREATE TABLE agent (
     r2z FLOAT NOT NULL,
     th1 FLOAT NOT NULL,
     th2 FLOAT NOT NULL,
-    step_summary JSONB,
     PRIMARY KEY (agent_id, env_id)
 );
 

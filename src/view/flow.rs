@@ -40,7 +40,7 @@ pub fn add_flow(
     commands.spawn(TextBundle::from_section(
         "Hello, Bevy!",
         TextStyle {
-            font: asset_server.load("fonts/Inconsolata/Inconsolata-Regular.ttf"),
+            font: asset_server.load("fonts/Inconsolata-Regular.ttf"),
             font_size: 40.0,
             color: Color::PURPLE,
         },

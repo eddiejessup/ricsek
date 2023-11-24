@@ -8,6 +8,7 @@ pub struct Env {
     pub run_id: i32,
     pub step: i32,
     pub t: f64,
+    pub step_summary: Option<serde_json::Value>,
 }
 
 #[derive(Queryable)]
@@ -22,7 +23,6 @@ pub struct Agent {
     pub r2z: f64,
     pub th1: f64,
     pub th2: f64,
-    pub step_summary: Option<serde_json::Value>,
 }
 
 #[derive(Queryable)]

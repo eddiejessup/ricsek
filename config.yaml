@@ -3,11 +3,11 @@ parameters:
   dt: 0.001
   boundaries:
     - l: 80
-      closed: true
-    - l: 20
-      closed: true
-    - l: 20
-      closed: true
+      closed: false
+    - l: 80
+      closed: false
+    - l: 80
+      closed: false
   singularities: []
     # - point: [0.0, 0.0, 0.0]
     #   params:
@@ -20,16 +20,16 @@ parameters:
   agent_length: 4.0
   agent_propulsion_force: 0.5e-6
 agent_initialization:
-  - type: RandomUniformByNumber
-    number: 100
+  # - type: RandomUniformByNumber
+  #   number: 100
   # - type: RandomUniformByVolumeNumberDensity
   #   volume_number_density: 0.01e17
-  # - type: Explicit
-  #   agents:
-  #     - r: [-9.0, +0.01, +0.0   ]
-  #       u: [+1.0   , +0.0   ,  +0.0   ]
-  #     - r: [+9.0, +0.0   ,  +0.0   ]
-  #       u: [-1.0   , +0.0   ,  +0.0   ]
+  - type: Explicit
+    agents:
+      - r: [0.0, 0.0, 0.0]
+        u: [+1.0   , +0.0   ,  +0.0   ]
+      # - r: [+9.0, +0.0   ,  +0.0   ]
+      #   u: [-1.0   , +0.0   ,  +0.0   ]
   # - type: Explicit
   #   agents:
   #     - r: [-9.0, +0.0, +0.0]
