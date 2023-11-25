@@ -16,18 +16,23 @@ pub struct PhysicalParams {
     pub singularities: Vec<super::singularities::Singularity>,
     // Agent shape.
     pub agent_radius: f64,
-    // Length includes the 'caps'.
+    //   Length includes the 'caps'.
     pub agent_length: f64,
-    // Stiffness of both agents and surfaces.
-    // (Used to compute the strength of agent-{agent, surface} electrostatics)
+    // Electrostatics.
+    //   Stiffness of both agents and surfaces, used to compute the strength of
+    //   agent-{agent, surface} repulsion.
+    pub enable_agent_agent_electro: bool,
+    pub enable_agent_boundary_electro: bool,
     pub object_stiffness: f64,
     // Fluid.
+    pub enable_fluid: bool,
     pub fluid_temperature: f64,
     pub fluid_viscosity: f64,
     // Agent propulsion.
     // Force the agent applies to the fluid through its propulsion.
     // (Used to compute the agent's empty-fluid velocity.)
     pub agent_propulsion_force: f64,
+    pub enable_agent_propulsion: bool,
 }
 
 impl PhysicalParams {
@@ -77,7 +82,7 @@ impl PhysicalParams {
     }
 
     pub fn agent_propulsive_stokeslet_strength(&self) -> f64 {
-      self.agent_propulsion_force / (8.0 * PI * self.fluid_viscosity)
+        self.agent_propulsion_force / (8.0 * PI * self.fluid_viscosity)
     }
 
     fn thermal_energy(&self) -> f64 {
@@ -115,6 +120,10 @@ impl PhysicalParams {
             agent_rotational_diffusion_coefficient: self
                 .agent_stokes_rotational_diffusion_coefficient(),
             agent_object_hertz_force_coefficient: self.agent_object_hertz_force_coefficient(),
+            enable_fluid: self.enable_fluid,
+            enable_agent_propulsion: self.enable_agent_propulsion,
+            enable_agent_agent_electro: self.enable_agent_agent_electro,
+            enable_agent_boundary_electro: self.enable_agent_boundary_electro,
         }
     }
 }

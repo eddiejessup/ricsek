@@ -9,7 +9,7 @@ use ricsek::view::{
     environment::Environment,
     flow::{self, FlowViewState},
     pan_orbit_camera::{add_camera, pan_orbit_camera_update},
-    ViewState, TIME_STEP,
+    TIME_STEP,
 };
 use std::time::Duration;
 
@@ -91,7 +91,6 @@ fn main() {
         ))
         .insert_resource(env)
         .insert_resource(FlowViewState::new(0.0))
-        .insert_resource(ViewState::default())
         .add_systems(Startup, add_camera)
         .add_systems(Startup, add_axis_arrows)
         // .add_systems(PostStartup, flow::add_flow)

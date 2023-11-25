@@ -98,11 +98,6 @@ pub fn update(
     run_context: &RunContext,
     rng: &mut rand::rngs::ThreadRng,
 ) -> StepSummary {
-    let enable_fluid = true;
-    let enable_agent_electro = true;
-    let enable_boundary_electro = true;
-    let enable_propulsion = true;
-
     let uniform_theta = Uniform::new(0.0, 2.0 * PI);
     let uniform_cos_phi = Uniform::new(-1.0, 1.0);
 
@@ -112,18 +107,13 @@ pub fn update(
         .iter()
         .map(|agent| agent.seg.clone())
         .collect();
-    // let agent_agent_electro_wrenches: Vec<_> = capsules_capsules_electro(
-    //     &agent_segments,
-    //     sim_params.agent_radius,
-    //     sim_params.agent_object_hertz_force_coefficient,
-    // );
-    let agent_agent_electro_wrenches: Vec<_> = if enable_agent_electro {
+    let agent_agent_electro_wrenches: Vec<_> = if sim_params.enable_agent_agent_electro {
         run_context.gpu_electro_context.evaluate(&agent_segments)
     } else {
         vec![zero_wrench(); sim_state.agents.len()]
     };
 
-    let fluid_twists: Vec<_> = if enable_fluid {
+    let fluid_twists: Vec<_> = if sim_params.enable_fluid {
         agents_fluid_twists(
             sim_params,
             &sim_state.agents,
@@ -140,7 +130,7 @@ pub fn update(
         // Agent propulsion.
         // We know there's no torque because it acts along the agent's axis.
         debug!("Computing propulsion force");
-        let f_propulsion = if enable_propulsion {
+        let f_propulsion = if sim_params.enable_agent_propulsion {
             agent.u().scale(sim_params.agent_propulsion_force)
         } else {
             zero()
@@ -150,7 +140,7 @@ pub fn update(
         let agent_agent_electro_wrench = agent_agent_electro_wrenches[i_agent].clone();
 
         debug!("Computing electrostatic repulsion between agents and boundaries");
-        let agent_boundary_electro_wrench = if enable_boundary_electro {
+        let agent_boundary_electro_wrench = if sim_params.enable_agent_boundary_electro {
             boundary::boundary_electro(
                 agent,
                 sim_params.agent_radius,
