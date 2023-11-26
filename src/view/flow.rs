@@ -3,7 +3,7 @@ use nalgebra::Vector3;
 
 use crate::view::common::vec3_to_gvec3;
 
-use super::{environment::Environment, common::spawn_arrow};
+use super::{common::spawn_arrow, environment::Environment};
 
 #[derive(Component, Clone)]
 pub struct VectorLabel(pub String);
@@ -38,7 +38,7 @@ pub fn add_flow(
     q_vsets: Query<Entity, With<VectorSet>>,
 ) {
     commands.spawn(TextBundle::from_section(
-        "Hello, Bevy!",
+        "",
         TextStyle {
             font: asset_server.load("fonts/Inconsolata-Regular.ttf"),
             font_size: 40.0,
@@ -98,14 +98,17 @@ pub fn update_flow(
         .collect();
 
     let mut text = q_text.get_single_mut().unwrap();
-    text.sections[0].value = format!("Flow vector: {}", match net_vs_and_labels.get(0) {
-      Some((labels, _)) => labels
-      .iter()
-      .map(|s| s.clone().0)
-      .collect::<Vec<String>>()
-      .join(", "),
-      None => "None".to_string(),
-    });
+    text.sections[0].value = format!(
+        "Flow vector: {}",
+        match net_vs_and_labels.get(0) {
+            Some((labels, _)) => labels
+                .iter()
+                .map(|s| s.clone().0)
+                .collect::<Vec<String>>()
+                .join(", "),
+            None => "None".to_string(),
+        }
+    );
 
     let v_max_scale = 1.0;
 
@@ -136,9 +139,8 @@ pub fn update_flow(
             // Set the orientation of the overall flow-vector.
             match vec3_to_gvec3(&v).try_normalize() {
                 Some(glam_u) => {
-                    *transform =
-                        Transform::from_scale(Vec3::splat(arrow_scale as f32))
-                            .looking_to(glam_u, Vec3::Z)
+                    *transform = Transform::from_scale(Vec3::splat(arrow_scale as f32))
+                        .looking_to(glam_u, Vec3::Z)
                 }
                 None => {
                     *visibility = Visibility::Hidden;

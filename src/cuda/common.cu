@@ -4,7 +4,7 @@ __host__ __device__ float apply_periodic_boundary(float d, float length)
 {
   if (d > 0.5f * length)
     return d - length;
-  else if (d < -0.5f * length)
+  else if (d <= -0.5f * length)
     return d + length;
   else
     return d;

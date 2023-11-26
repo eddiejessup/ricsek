@@ -2,6 +2,7 @@ use crate::config::setup::SetupConfig;
 use crate::dynamics::StepSummary;
 use crate::geometry::line_segment::LineSegment;
 use crate::state::*;
+use diesel::dsl::Eq;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
@@ -22,16 +23,19 @@ pub fn establish_connection() -> PgConnection {
 }
 
 pub fn initialize_run(conn: &mut PgConnection, config: &SetupConfig) -> usize {
-    use crate::db::schema::run::dsl::*;
-    use diesel::dsl::Eq;
+    use crate::db::schema::run::dsl;
+
     let run_id: i32 = diesel::insert_into(crate::db::schema::run::table)
         .values((
-            None::<Eq<id, i32>>,
-            None::<Eq<created_at, time::OffsetDateTime>>,
-            parameters.eq(serde_json::to_value(&config.parameters).unwrap()),
-            agent_initialization.eq(serde_json::to_value(&config.agent_initialization).unwrap()),
+            None::<Eq<dsl::id, i32>>,
+            None::<Eq<dsl::created_at, time::OffsetDateTime>>,
+            dsl::parameters.eq(serde_json::to_value(&config.parameters).unwrap()),
+            dsl::agent_initialization
+                .eq(serde_json::to_value(&config.agent_initialization).unwrap()),
+            dsl::sampling_config.eq(serde_json::to_value(&config.sampling).unwrap()),
+            dsl::sample_points.eq(serde_json::to_value(&config.sample_points.clone()).unwrap()),
         ))
-        .returning(id)
+        .returning(dsl::id)
         .get_result(conn)
         .unwrap();
     run_id as usize
@@ -43,22 +47,21 @@ pub fn write_checkpoint(
     sim_state: &SimState,
     summary: Option<StepSummary>,
 ) -> Result<i32, Error> {
-    use crate::db::schema::env::dsl::*;
-    use diesel::dsl::Eq;
+    use crate::db::schema::env::dsl;
 
     let eid = conn.transaction::<i32, Error, _>(|conn| {
-        let eid: i32 = diesel::insert_into(env)
+        let eid: i32 = diesel::insert_into(dsl::env)
             .values((
-                None::<Eq<id, i32>>,
-                run_id.eq(rid as i32),
-                step.eq(sim_state.step as i32),
-                t.eq(sim_state.t),
-                step_summary.eq(match summary {
+                None::<Eq<dsl::id, i32>>,
+                dsl::run_id.eq(rid as i32),
+                dsl::step.eq(sim_state.step as i32),
+                dsl::t.eq(sim_state.t),
+                dsl::step_summary.eq(match summary {
                     Some(ref v) => Some(serde_json::to_value(v).unwrap()),
                     None => None,
                 }),
             ))
-            .returning(id)
+            .returning(dsl::id)
             .get_result(conn)?;
 
         use crate::db::schema::agent::dsl::*;
@@ -90,37 +93,45 @@ pub fn write_checkpoint(
 }
 
 pub fn read_latest_run_id(conn: &mut PgConnection) -> usize {
-    use schema::run::dsl::*;
-    let rid: i32 = run.order(created_at.desc()).select(id).first(conn).unwrap();
+    use schema::run::dsl;
+    let rid: i32 = dsl::run
+        .order(dsl::created_at.desc())
+        .select(dsl::id)
+        .first(conn)
+        .unwrap();
     rid as usize
 }
 
 pub fn read_run(conn: &mut PgConnection, rid: usize) -> SetupConfig {
-    use schema::run::dsl::*;
-    let v = run
-        .filter(schema::run::id.eq(rid as i32))
+    use schema::run::dsl;
+
+    let v = dsl::run
+        .filter(dsl::id.eq(rid as i32))
         .get_result::<models::Run>(conn)
         .unwrap();
     SetupConfig {
         parameters: serde_json::from_value(v.parameters).unwrap(),
         agent_initialization: serde_json::from_value(v.agent_initialization).unwrap(),
+        sampling: serde_json::from_value(v.sampling_config).unwrap(),
+        sample_points: serde_json::from_value(v.sample_points).unwrap(),
     }
 }
 
 pub fn read_run_envs(conn: &mut PgConnection, rid: usize) -> Vec<models::Env> {
-    use schema::env::dsl::*;
-    env.filter(run_id.eq(rid as i32))
-        .order(step.asc())
+    use schema::env::dsl;
+    dsl::env
+        .filter(dsl::run_id.eq(rid as i32))
+        .order(dsl::step.asc())
         .load::<models::Env>(conn)
         .unwrap()
 }
 
 pub fn read_agents(conn: &mut PgConnection, env_id_: i32) -> Vec<Agent> {
-    use schema::agent::dsl::*;
+    use schema::agent::dsl;
 
-    let agent_vals: Vec<models::Agent> = agent
-        .filter(env_id.eq(env_id_))
-        .order(agent_id.asc())
+    let agent_vals: Vec<models::Agent> = dsl::agent
+        .filter(dsl::env_id.eq(env_id_))
+        .order(dsl::agent_id.asc())
         .get_results::<models::Agent>(conn)
         .unwrap();
 

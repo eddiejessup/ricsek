@@ -1,8 +1,8 @@
-use self::{simulation::SimParams, physical::PhysicalParams};
+use self::{physical::PhysicalParams, simulation::SimParams};
 
+pub mod common;
 pub mod physical;
 pub mod simulation;
-pub mod common;
 pub mod singularities;
 
 #[derive(serde::Serialize, serde::Deserialize)]

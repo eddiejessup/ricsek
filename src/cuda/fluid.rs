@@ -15,6 +15,7 @@ use super::interface::{
 pub struct CudaFluidContext {
     device_data: *mut FluidDeviceData,
     num_eval_points: u32,
+    num_singularities: u32,
     threads_per_block_axis: u32,
 }
 
@@ -35,6 +36,7 @@ impl CudaFluidContext {
         Self {
             device_data,
             num_eval_points,
+            num_singularities,
             threads_per_block_axis,
         }
     }
@@ -44,6 +46,21 @@ impl CudaFluidContext {
         eval_points: &[(u32, Point3<f64>)],
         singularities: &[(u32, Singularity)],
     ) -> Vec<(Vector3<f64>, Vector3<f64>)> {
+        if eval_points.len() as u32 != self.num_eval_points {
+            panic!(
+                "eval_points.len() = {} but self.num_eval_points = {}",
+                eval_points.len(),
+                self.num_eval_points
+            );
+        }
+        if singularities.len() as u32 != self.num_singularities {
+            panic!(
+                "singularities.len() = {} but self.num_singularities = {}",
+                singularities.len(),
+                self.num_singularities
+            );
+        }
+
         let mut eval_points_c: Vec<ObjectPoint> = eval_points
             .iter()
             .map(|(object_id, position)| ObjectPoint {

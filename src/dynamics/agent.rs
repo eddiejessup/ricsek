@@ -49,7 +49,13 @@ pub fn capsule_capsule_electro(
         radius,
         seg1,
     );
-    println!("closest-point-on-i={}, overlap={}, force={}, torque={}", seg1p, 2.0 * radius - r1c_r2c.magnitude(), force, torque);
+    println!(
+        "closest-point-on-i={}, overlap={}, force={}, torque={}",
+        seg1p,
+        2.0 * radius - r1c_r2c.magnitude(),
+        force,
+        torque
+    );
     Wrench { force, torque }
 }
 

@@ -5,9 +5,9 @@ parameters:
     - l: 80
       closed: false
     - l: 80
-      closed: false
+      closed: true
     - l: 80
-      closed: false
+      closed: true
   singularities:
     []
     # - point: [0.0, 0.0, 0.0]
@@ -24,6 +24,8 @@ parameters:
   enable_agent_boundary_electro: true
   enable_fluid: true
   enable_agent_propulsion: true
+sampling:
+  n_sample_points: 4000
 agent_initialization:
   # - type: RandomUniformByNumber
   #   number: 100

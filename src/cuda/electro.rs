@@ -35,6 +35,14 @@ impl CudaElectroContext {
     }
 
     pub fn evaluate(&self, segments: &[line_segment::LineSegment]) -> Vec<Wrench> {
+        if segments.len() as u32 != self.num_segments {
+            panic!(
+                "segments.len() = {} but self.num_segments = {}",
+                segments.len(),
+                self.num_segments
+            );
+        }
+
         let mut segments_c: Vec<V3Pair> = segments
             .iter()
             .map(|s| V3Pair {
@@ -77,7 +85,8 @@ impl Drop for CudaElectroContext {
 mod tests {
     use crate::{
         config::setup::parameters::common::{AxisBoundaryConfig, BoundaryConfig},
-        dynamics::agent::capsules_capsules_electro, geometry::line_segment::LineSegment,
+        dynamics::agent::capsules_capsules_electro,
+        geometry::line_segment::LineSegment,
     };
 
     use super::CudaElectroContext;

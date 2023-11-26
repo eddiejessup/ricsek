@@ -4,18 +4,29 @@ pub mod parameters;
 use std::{error::Error, fs::File, io::Read, path::Path};
 
 use log::info;
+use nalgebra::Point3;
+
+use crate::geometry::grid_3d;
 
 use self::{agents::AgentInitializationConfig, parameters::simulation::SimParams};
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct SamplingConfig {
+    pub n_sample_points: u32,
+}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct SetupConfigYaml {
     parameters: parameters::ParametersYaml,
     agent_initialization: Vec<AgentInitializationConfig>,
+    sampling: SamplingConfig,
 }
 
 pub struct SetupConfig {
     pub parameters: SimParams,
     pub agent_initialization: Vec<AgentInitializationConfig>,
+    pub sampling: SamplingConfig,
+    pub sample_points: Vec<Point3<f64>>,
 }
 
 impl SetupConfig {
@@ -28,9 +39,15 @@ impl SetupConfig {
             parameters::ParametersYaml::Physical(physical_params) => physical_params.as_params(),
             parameters::ParametersYaml::Simulation(sim_params) => sim_params,
         };
+        let sample_points = grid_3d(
+            parameters.boundaries.l(),
+            config_raw.sampling.n_sample_points as usize,
+        );
         let config = SetupConfig {
             parameters,
             agent_initialization: config_raw.agent_initialization,
+            sampling: config_raw.sampling,
+            sample_points,
         };
         Ok(config)
     }

@@ -5,10 +5,10 @@ use bevy::{
     prelude::*,
     time::common_conditions::on_timer,
 };
-use nalgebra::Point3;
+use nalgebra::{zero, Point3};
 use ricsek::{
-    config::{run::RunContext, setup::parameters::simulation::SimParams},
-    dynamics::{StepSummary, run_steps},
+    config::{run::RunContext, setup::SetupConfig},
+    dynamics::{run_steps, StepSummary},
     state::SimState,
     view::{
         common::{add_axis_arrows, point3_to_gvec3, vec3_to_gvec3},
@@ -20,29 +20,37 @@ use ricsek::{
 };
 use structopt::StructOpt;
 
-#[derive(Component)]
-pub struct AgentId(pub usize);
+// Resources.
 
 #[derive(Resource)]
 pub struct SimViewState {
     pub i: usize,
     pub checkpoint_stepsize: usize,
-    pub sim_stepsize: usize
+    pub sim_stepsize: usize,
 }
 
 impl Default for SimViewState {
     fn default() -> Self {
-        Self { i: 0, checkpoint_stepsize: 1, sim_stepsize: 10 }
+        Self {
+            i: 0,
+            checkpoint_stepsize: 1,
+            sim_stepsize: 10,
+        }
     }
 }
-
-impl SimViewState {}
 
 #[derive(Resource)]
 pub struct SimStates(pub Vec<(SimState, Option<StepSummary>)>);
 
 #[derive(Resource)]
-pub struct SimParamsRes(pub SimParams);
+pub struct SetupConfigRes(pub SetupConfig);
+
+// / Resources.
+
+// Components.
+
+#[derive(Component)]
+pub struct AgentId(pub usize);
 
 #[derive(Component)]
 pub enum AgentBodyComponent {
@@ -51,10 +59,74 @@ pub enum AgentBodyComponent {
     Rod,
 }
 
+#[derive(Component)]
+pub struct FlowMarkerId(pub usize);
+
+// / Components.
+
+pub fn add_flow_markers(
+    mut commands: Commands,
+    setup_config: Res<SetupConfigRes>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // Marker bases.
+    let red: Handle<StandardMaterial> = materials.add(StandardMaterial::from(Color::RED));
+    let cube: Handle<Mesh> = meshes.add((shape::Cube { size: 0.1 }).into()).into();
+
+    for (i, sample) in setup_config.0.sample_points.iter().enumerate() {
+        commands.spawn((
+            PbrBundle {
+                mesh: cube.clone(),
+                material: red.clone(),
+                transform: Transform::from_translation(point3_to_gvec3(&sample)),
+                ..default()
+            },
+            FlowMarkerId(i),
+            flow::VectorSet(vec![]),
+        ));
+    }
+}
+
+fn update_flow_markers(
+    sim_states: Res<SimStates>,
+    view_state: Res<SimViewState>,
+    mut q_point: Query<(&FlowMarkerId, &mut flow::VectorSet)>,
+) {
+    let view_i = view_state.i;
+    let (_cur_sim_state, cur_step_summary) = &sim_states.0[view_i];
+
+    debug!("Updating flow for agents, to view_i: {}", view_i);
+    if let Some(StepSummary {
+        agent_summaries: _,
+        fluid_flow,
+    }) = cur_step_summary
+    {
+        for (marker_id, mut vector_set) in &mut q_point {
+            let marker_fluid_v = fluid_flow[marker_id.0];
+            *vector_set = flow::VectorSet(vec![
+                (flow::VectorLabel("f_agent_electro".to_string()), zero()),
+                (
+                    flow::VectorLabel("torque_agent_electro".to_string()),
+                    zero(),
+                ),
+                (flow::VectorLabel("f_propulsion".to_string()), zero()),
+                (flow::VectorLabel("f_boundary_electro".to_string()), zero()),
+                (
+                    flow::VectorLabel("torque_boundary_electro".to_string()),
+                    zero(),
+                ),
+                (flow::VectorLabel("v_fluid".to_string()), marker_fluid_v),
+                (flow::VectorLabel("v_fluid_front".to_string()), zero()),
+            ])
+        }
+    }
+}
+
 pub fn add_agents(
     mut commands: Commands,
     sim_states: Res<SimStates>,
-    params: Res<SimParamsRes>,
+    setup_config: Res<SetupConfigRes>,
     view_state: Res<SimViewState>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -62,7 +134,7 @@ pub fn add_agents(
     let view_i = view_state.i;
     let (cur_sim_state, _) = &sim_states.0[view_i];
 
-    let params = &params.0;
+    let params = &setup_config.0.parameters;
 
     let radius = params.agent_radius;
 
@@ -151,7 +223,11 @@ fn update_agent_points(
         let torque_coeff = 1e6;
         let v_coeff = 1e-2;
 
-        if let Some(StepSummary { agent_summaries }) = cur_step_summary {
+        if let Some(StepSummary {
+            agent_summaries,
+            fluid_flow: _,
+        }) = cur_step_summary
+        {
             let agent_summary = &agent_summaries[agent_id.0];
             *vector_set = flow::VectorSet(vec![
                 (
@@ -175,12 +251,8 @@ fn update_agent_points(
                     torque_coeff * agent_summary.torque_boundary_electro,
                 ),
                 (
-                    flow::VectorLabel("v_fluid_back".to_string()),
-                    v_coeff * agent_summary.v_fluid_back,
-                ),
-                (
-                    flow::VectorLabel("v_fluid_front".to_string()),
-                    v_coeff * agent_summary.v_fluid_front,
+                    flow::VectorLabel("v_fluid".to_string()),
+                    v_coeff * agent_summary.v_fluid,
                 ),
             ])
         }
@@ -215,7 +287,7 @@ fn update_agent_orientations(
 
 fn change_view(
     keyboard_input: Res<Input<KeyCode>>,
-    params: Res<SimParamsRes>,
+    setup_config: Res<SetupConfigRes>,
     mut sim_states: ResMut<SimStates>,
     mut view_state: ResMut<SimViewState>,
 ) {
@@ -236,11 +308,15 @@ fn change_view(
         if !backward && view_state.i == sim_states.0.len() - 1 {
             let mut final_state = (&sim_states.0[view_state.i]).0.clone();
 
-            let run_context = RunContext::new(&params.0, final_state.agents.len());
+            let run_context = RunContext::new(
+                &setup_config.0.parameters,
+                final_state.agents.len(),
+                setup_config.0.sample_points.clone(),
+            );
             let rng = &mut rand::thread_rng();
 
             let summary = run_steps(
-                &params.0,
+                &setup_config.0.parameters,
                 &mut final_state,
                 &run_context,
                 rng,
@@ -299,6 +375,7 @@ fn main() {
     };
 
     let setup = ricsek::db::read_run(conn, run_id);
+
     let sim_states = ricsek::db::read_run_sim_states(conn, run_id);
 
     let env = Environment {
@@ -316,12 +393,13 @@ fn main() {
         ))
         .insert_resource(env)
         .insert_resource(SimStates(sim_states))
-        .insert_resource(SimParamsRes(setup.parameters))
+        .insert_resource(SetupConfigRes(setup))
         .insert_resource(FlowViewState::new(0.0))
         .insert_resource(SimViewState::default())
         .add_systems(Startup, add_camera)
         .add_systems(Startup, add_axis_arrows)
         .add_systems(Startup, add_agents)
+        .add_systems(Startup, add_flow_markers)
         .add_systems(Startup, environment::add_boundaries)
         .add_systems(PostStartup, flow::add_flow)
         .add_systems(Update, pan_orbit_camera_update)
@@ -330,6 +408,7 @@ fn main() {
             (
                 update_agent_points,
                 update_agent_orientations,
+                update_flow_markers,
                 change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
             ),
         )

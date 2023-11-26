@@ -31,4 +31,6 @@ pub struct Run {
     pub created_at: time::OffsetDateTime,
     pub parameters: serde_json::Value,
     pub agent_initialization: serde_json::Value,
+    pub sampling_config: serde_json::Value,
+    pub sample_points: serde_json::Value,
 }

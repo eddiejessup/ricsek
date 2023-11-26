@@ -205,6 +205,7 @@ extern "C"
   void electro_evaluate(ElectroDeviceData *device_data, V3Pair *segments, V3Pair *net_wrenches, unsigned int threads_per_block_axis, unsigned int num_approx_points)
   {
     cudaMemcpy(device_data->segments, segments, device_data->segments_size, cudaMemcpyHostToDevice);
+    cudaDeviceSynchronize();
 
     unsigned int num_blocks_per_axis = (device_data->num_segments + threads_per_block_axis - 1) / threads_per_block_axis;
     dim3 block_structure = dim3(threads_per_block_axis, threads_per_block_axis);
@@ -218,23 +219,24 @@ extern "C"
         device_data->pairwise_wrenches,
         device_data->num_segments,
         num_approx_points);
+    cudaDeviceSynchronize();
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess)
     {
-      printf("Kernel launch failed with error: %s\n", cudaGetErrorString(err));
+      printf("Kernel '%s' launch failed with error: %s\n", "evaluateWrench", cudaGetErrorString(err));
     }
 
     dim3 gather_block_structure = dim3(threads_per_block_axis);
     dim3 gather_grid_structure = dim3(num_blocks_per_axis);
     gatherWrenches<<<gather_grid_structure, gather_block_structure>>>(device_data->pairwise_wrenches, device_data->net_wrenches, device_data->num_segments);
+    cudaDeviceSynchronize();
     err = cudaGetLastError();
     if (err != cudaSuccess)
     {
-      printf("Kernel launch failed with error: %s\n", cudaGetErrorString(err));
+      printf("Kernel '%s' launch failed with error: %s\n", "gatherWrenches", cudaGetErrorString(err));
     }
 
     cudaMemcpy(net_wrenches, device_data->net_wrenches, device_data->net_wrenches_size, cudaMemcpyDeviceToHost);
-
     cudaDeviceSynchronize();
   }
 

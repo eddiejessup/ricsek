@@ -31,6 +31,8 @@ diesel::table! {
         created_at -> Timestamptz,
         parameters -> Jsonb,
         agent_initialization -> Jsonb,
+        sampling_config -> Jsonb,
+        sample_points -> Jsonb,
     }
 }
 
