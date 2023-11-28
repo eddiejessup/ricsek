@@ -91,12 +91,12 @@ __global__ void evaluateWrench(V3Pair *segments, V3Pair *pairwise_wrenches, unsi
     // Consider positions relative to segment_i, then apply periodic boundary conditions.
     V3 segment_i_centroid = segment_centroid(segment_i);
     segment_i = V3Pair{
-        apply_boundary_conditions(sub(segment_i.a, segment_i_centroid), d_bc),
-        apply_boundary_conditions(sub(segment_i.b, segment_i_centroid), d_bc),
+        apply_boundary_conditions_point(sub(segment_i.a, segment_i_centroid), d_bc),
+        apply_boundary_conditions_point(sub(segment_i.b, segment_i_centroid), d_bc),
     };
     segment_j = V3Pair{
-        apply_boundary_conditions(sub(segment_j.a, segment_i_centroid), d_bc),
-        apply_boundary_conditions(sub(segment_j.b, segment_i_centroid), d_bc),
+        apply_boundary_conditions_point(sub(segment_j.a, segment_i_centroid), d_bc),
+        apply_boundary_conditions_point(sub(segment_j.b, segment_i_centroid), d_bc),
     };
 
     unsigned int pair_idx = i * num_segments + j;

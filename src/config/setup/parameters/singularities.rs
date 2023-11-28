@@ -1,4 +1,4 @@
-use crate::dynamics::stokes_solutions::*;
+use crate::{dynamics::stokes_solutions::*, geometry::point::ObjectPoint};
 
 use nalgebra::{zero, Point3, Vector3};
 
@@ -31,6 +31,14 @@ impl SingularityParams {
             ),
         }
     }
+
+    pub fn eval_from_to(
+        &self,
+        r_from: Point3<f64>,
+        r_to: Point3<f64>,
+    ) -> (Vector3<f64>, Vector3<f64>) {
+        self.eval(r_to - r_from)
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -41,33 +49,33 @@ pub struct Singularity {
 
 impl Singularity {
     pub fn eval(&self, r: Point3<f64>) -> (Vector3<f64>, Vector3<f64>) {
-        self.params.eval(r - self.point)
+        self.params.eval_from_to(self.point, r)
     }
 }
 
 pub fn singularities_fluid_v(
-    r_eval: Point3<f64>,
-    i_eval: u32,
-    singularities: &[(u32, Singularity)],
+    p_eval: &ObjectPoint,
+    singularities: &[(ObjectPoint, SingularityParams)],
 ) -> (Vector3<f64>, Vector3<f64>) {
-    singularities
-        .iter()
-        .fold((zero(), zero()), |(v_tot, vort_tot), (i_sing, sing)| {
-            if i_eval == *i_sing {
+    singularities.iter().fold(
+        (zero(), zero()),
+        |(v_tot, vort_tot), (p_sing, sing_params)| {
+            if p_eval.object_id == p_sing.object_id {
                 (v_tot, vort_tot)
             } else {
-                let (v, vort) = sing.eval(r_eval);
+                let (v, vort) = sing_params.eval_from_to(p_sing.position, p_eval.position);
                 (v_tot + v, vort_tot + vort)
             }
-        })
+        },
+    )
 }
 
 pub fn singularities_fluid_v_multi(
-    eval_points: &[(u32, Point3<f64>)],
-    singularities: &[(u32, Singularity)],
+    eval_points: &[ObjectPoint],
+    singularities: &[(ObjectPoint, SingularityParams)],
 ) -> Vec<(Vector3<f64>, Vector3<f64>)> {
     eval_points
         .iter()
-        .map(|(i_eval, r_eval)| singularities_fluid_v(*r_eval, *i_eval, singularities))
+        .map(|p| singularities_fluid_v(p, singularities))
         .collect()
 }

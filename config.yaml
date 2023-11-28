@@ -5,9 +5,9 @@ parameters:
     - l: 80
       closed: false
     - l: 80
-      closed: true
+      closed: false
     - l: 80
-      closed: true
+      closed: false
   singularities:
     []
     # - point: [0.0, 0.0, 0.0]

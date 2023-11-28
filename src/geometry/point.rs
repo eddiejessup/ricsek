@@ -3,6 +3,23 @@ use rand::distributions::Distribution;
 use rand::rngs::ThreadRng;
 use rand_distr::StandardNormal;
 
+#[derive(Clone)]
+pub struct ObjectPoint {
+    pub object_id: u32,
+    pub position: Point3<f64>,
+    pub position_com: Point3<f64>,
+}
+
+impl ObjectPoint {
+    pub fn point_object(object_id: u32, position: Point3<f64>) -> Self {
+        Self {
+            object_id,
+            position,
+            position_com: position,
+        }
+    }
+}
+
 pub fn unit_angle_cos_sin_2d(u: UnitVector2<f64>, v: UnitVector2<f64>) -> (f64, f64) {
     let dot_product = u.dot(&v);
     let cross_product = u.perp(&v);

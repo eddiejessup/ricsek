@@ -1,32 +1,5 @@
 #include <cuda_ricsek.h>
 
-__host__ __device__ float apply_periodic_boundary(float d, float length)
-{
-  if (d > 0.5f * length)
-    return d - length;
-  else if (d <= -0.5f * length)
-    return d + length;
-  else
-    return d;
-}
-
-__host__ __device__ V3 apply_boundary_conditions(V3 d, BoundaryConfig bc)
-{
-  if (!bc.closed_x)
-  {
-    d.x = apply_periodic_boundary(d.x, bc.lengths.x);
-  }
-  if (!bc.closed_y)
-  {
-    d.y = apply_periodic_boundary(d.y, bc.lengths.y);
-  }
-  if (!bc.closed_z)
-  {
-    d.z = apply_periodic_boundary(d.z, bc.lengths.z);
-  }
-  return d;
-}
-
 __host__ __device__ V3 sub(V3 a, V3 b)
 {
   return V3{a.x - b.x, a.y - b.y, a.z - b.z};
@@ -84,4 +57,43 @@ __host__ __device__ V3 zero_v3()
 __host__ __device__ V3Pair zero_v3_pair()
 {
   return V3Pair{zero_v3(), zero_v3()};
+}
+
+__host__ __device__ float apply_periodic_boundary_obj(float d_com, float d, float length)
+{
+  if (d_com > 0.5f * length)
+    return d - length;
+  else if (d_com < -0.5f * length)
+    return d + length;
+  else
+    return d;
+}
+
+__host__ __device__ V3 apply_boundary_conditions_obj(V3 r_com, V3 r, BoundaryConfig bc)
+{
+  if (!bc.closed_x)
+  {
+    r.x = apply_periodic_boundary_obj(r_com.x, r.x, bc.lengths.x);
+  }
+  if (!bc.closed_y)
+  {
+    r.y = apply_periodic_boundary_obj(r_com.y, r.y, bc.lengths.y);
+  }
+  if (!bc.closed_z)
+  {
+    r.z = apply_periodic_boundary_obj(r_com.z, r.z, bc.lengths.z);
+  }
+  return r;
+}
+
+__host__ __device__ V3 apply_boundary_conditions_point(V3 r, BoundaryConfig bc)
+{
+  return apply_boundary_conditions_obj(r, r, bc);
+}
+
+__host__ __device__ V3 minimum_image_vector_objs(ObjectPoint p_to, ObjectPoint p_from, BoundaryConfig bc)
+{
+  V3 r_com = sub(p_to.position_com, p_from.position_com);
+  V3 r = sub(p_to.position, p_from.position);
+  return apply_boundary_conditions_obj(r_com, r, bc);
 }

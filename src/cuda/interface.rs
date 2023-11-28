@@ -3,7 +3,7 @@
 
 use nalgebra::{Point3, Vector3};
 
-use crate::config::setup::parameters::common;
+use crate::{config::setup::parameters::common, geometry::point};
 
 include!(concat!(env!("OUT_DIR"), "/cuda_ricsek_bindings.rs"));
 
@@ -42,11 +42,19 @@ pub fn v3_as_vec(v: V3) -> Vector3<f64> {
     Vector3::new(v.x as f64, v.y as f64, v.z as f64)
 }
 
-pub fn boundary_config_to_c(bc: common::BoundaryConfig) -> BoundaryConfig {
+pub fn boundary_config_to_c(bc: &common::BoundaryConfig) -> BoundaryConfig {
     BoundaryConfig {
         lengths: vec_as_V3(bc.l()),
         closed_x: bc.0.x.closed,
         closed_y: bc.0.y.closed,
         closed_z: bc.0.z.closed,
+    }
+}
+
+pub fn object_point_to_c(op: &point::ObjectPoint) -> ObjectPoint {
+    ObjectPoint {
+        object_id: op.object_id,
+        position_com: point_as_V3(op.position_com),
+        position: point_as_V3(op.position),
     }
 }

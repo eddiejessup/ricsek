@@ -17,7 +17,7 @@ pub struct CudaElectroContext {
 impl CudaElectroContext {
     pub fn new(
         num_segments: u32,
-        boundary_config: BoundaryConfig,
+        boundary_config: &BoundaryConfig,
         radius: f32,
         electro_coeff: f64,
         num_approx_points: u32,
@@ -128,7 +128,7 @@ mod tests {
 
         let gpu_context = CudaElectroContext::new(
             segments.len() as u32,
-            boundary_config,
+            &boundary_config,
             radius,
             electro_coeff,
             num_approx_points,

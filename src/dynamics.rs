@@ -12,7 +12,7 @@ use crate::config::setup::parameters::simulation::SimParams;
 use crate::config::setup::parameters::singularities::{Singularity, SingularityParams};
 use crate::dynamics::common::zero_wrench;
 use crate::geometry::line_segment::LineSegment;
-use crate::geometry::point::random_vector;
+use crate::geometry::point::{random_vector, ObjectPoint};
 use crate::state::*;
 use diesel::result::Error;
 use log::{debug, info};
@@ -58,14 +58,26 @@ pub fn agent_singularities(sim_params: &SimParams, agent: &Agent) -> Vec<Singula
     ]
 }
 
-pub fn agents_singularities(sim_params: &SimParams, agents: &[Agent]) -> Vec<(u32, Singularity)> {
+pub fn agents_singularities(
+    sim_params: &SimParams,
+    agents: &[Agent],
+) -> Vec<(ObjectPoint, SingularityParams)> {
     agents
         .iter()
         .enumerate()
         .flat_map(|(i_agent, agent)| {
             agent_singularities(sim_params, agent)
                 .iter()
-                .map(|singularity| (i_agent as u32, singularity.clone()))
+                .map(|singularity| {
+                    (
+                        ObjectPoint {
+                            object_id: i_agent as u32,
+                            position_com: agent.seg.centroid(),
+                            position: singularity.point,
+                        },
+                        singularity.params.clone(),
+                    )
+                })
                 .collect::<Vec<_>>()
         })
         .collect()
@@ -123,12 +135,17 @@ pub fn update(
             .agents
             .iter()
             .enumerate()
-            .map(|(i_agent, agent)| (i_agent as u32, agent.seg.centroid()))
+            .map(|(i_agent, agent)| ObjectPoint {
+                object_id: i_agent as u32,
+                position_com: agent.seg.centroid(),
+                position: agent.seg.centroid(),
+            })
             .collect();
         let fluid_twists_at_agents = run_context
             .gpu_fluid_agent_context
             .evaluate(&agent_eval_points, &agent_singularities);
 
+        // let fluid_flow = vec![zero(); run_context.sample_eval_points.len()];
         let fluid_flow = run_context
             .gpu_fluid_sample_context
             .evaluate(&run_context.sample_eval_points, &agent_singularities)

@@ -20,6 +20,7 @@ typedef struct
 typedef struct
 {
   unsigned int object_id;
+  V3 position_com;
   V3 position;
 } ObjectPoint;
 

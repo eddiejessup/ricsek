@@ -15,7 +15,7 @@ __global__ void evaluateStokeslet(ObjectPoint *eval_points, Stokeslet *stokeslet
     Stokeslet stokeslet = stokeslets[stokeslet_i];
 
     unsigned int pair_idx = eval_i * num_stokeslets + stokeslet_i;
-    // printf("EVAL: eval_i=%u, stokeslet_i=%u, pair_idx=%u\n", eval_i, stokeslet_i, pair_idx);
+    // printf("EVAL: eval_i=%u, stokeslet_i=%u, pair_idx=%u, eval_point.object_id=%u, stokeslet.object_point.object_id=%u\n", eval_i, stokeslet_i, pair_idx, eval_point.object_id, stokeslet.object_point.object_id);
     if (eval_point.object_id == stokeslet.object_point.object_id)
     {
       pairwise_twists[pair_idx] = zero_v3_pair();
@@ -23,7 +23,7 @@ __global__ void evaluateStokeslet(ObjectPoint *eval_points, Stokeslet *stokeslet
     }
 
     // r is the vector pointing from the singularity to the point of interest.
-    V3 r = apply_boundary_conditions(sub(eval_point.position, stokeslet.object_point.position), d_bc);
+    V3 r = minimum_image_vector_objs(eval_point, stokeslet.object_point, d_bc);
 
     float r1 = length(r);
     float r1_inv = 1.0 / r1;

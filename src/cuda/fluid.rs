@@ -1,14 +1,14 @@
 use core::panic;
 
-use nalgebra::{Point3, Vector3};
+use nalgebra::Vector3;
 
-use crate::config::setup::parameters::{
-    common::BoundaryConfig,
-    singularities::{Singularity, SingularityParams},
+use crate::{
+    config::setup::parameters::{common::BoundaryConfig, singularities::SingularityParams},
+    geometry::point,
 };
 
 use super::interface::{
-    boundary_config_to_c, fluid_evaluate, fluid_finalize, fluid_init, point_as_V3, v3_as_vec,
+    boundary_config_to_c, fluid_evaluate, fluid_finalize, fluid_init, object_point_to_c, v3_as_vec,
     vec_as_V3, zero_v3_pair, FluidDeviceData, ObjectPoint, Stokeslet, V3Pair,
 };
 
@@ -23,7 +23,7 @@ impl CudaFluidContext {
     pub fn new(
         num_eval_points: u32,
         num_singularities: u32,
-        boundary_config: BoundaryConfig,
+        boundary_config: &BoundaryConfig,
         threads_per_block_axis: u32,
     ) -> Self {
         let device_data = unsafe {
@@ -43,8 +43,8 @@ impl CudaFluidContext {
 
     pub fn evaluate(
         &self,
-        eval_points: &[(u32, Point3<f64>)],
-        singularities: &[(u32, Singularity)],
+        eval_points: &[point::ObjectPoint],
+        singularities: &[(point::ObjectPoint, SingularityParams)],
     ) -> Vec<(Vector3<f64>, Vector3<f64>)> {
         if eval_points.len() as u32 != self.num_eval_points {
             panic!(
@@ -61,25 +61,17 @@ impl CudaFluidContext {
             );
         }
 
-        let mut eval_points_c: Vec<ObjectPoint> = eval_points
-            .iter()
-            .map(|(object_id, position)| ObjectPoint {
-                object_id: *object_id,
-                position: point_as_V3(*position),
-            })
-            .collect();
+        let mut eval_points_c: Vec<ObjectPoint> =
+            eval_points.iter().map(|op| object_point_to_c(op)).collect();
 
         let mut stokeslets_c: Vec<Stokeslet> = singularities
             .iter()
-            .map(|(object_id, singularity)| {
-                let object_point = ObjectPoint {
-                    object_id: *object_id,
-                    position: point_as_V3(singularity.point),
-                };
-                match singularity.params {
+            .map(|(object_pt, params)| {
+                let object_point = object_point_to_c(object_pt);
+                match params {
                     SingularityParams::Stokeslet { a } => Stokeslet {
                         object_point,
-                        force: vec_as_V3(a),
+                        force: vec_as_V3(*a),
                     },
                     SingularityParams::StokesDoublet { a: _, b: _ } => {
                         panic!("StokesDoublet not supported")
@@ -129,9 +121,12 @@ mod tests {
     use approx::assert_relative_eq;
     use nalgebra::{Point3, Vector3};
 
-    use crate::config::setup::parameters::{
-        common::{AxisBoundaryConfig, BoundaryConfig},
-        singularities::{singularities_fluid_v_multi, Singularity, SingularityParams},
+    use crate::{
+        config::setup::parameters::{
+            common::{AxisBoundaryConfig, BoundaryConfig},
+            singularities::{singularities_fluid_v_multi, SingularityParams},
+        },
+        geometry::point,
     };
 
     #[test]
@@ -153,27 +148,21 @@ mod tests {
         ));
         // Define two positions
         let eval_points = vec![
-            (0, Point3::new(0.0, 0.0, 0.0)),
-            (1, Point3::new(1.0, 0.0, 0.0)),
+            point::ObjectPoint::point_object(0, Point3::new(0.0, 0.0, 0.0)),
+            point::ObjectPoint::point_object(1, Point3::new(1.0, 0.0, 0.0)),
         ];
 
         let singularities = vec![
             (
-                0,
-                Singularity {
-                    point: Point3::new(0.0, 0.0, 0.0),
-                    params: SingularityParams::Stokeslet {
-                        a: Vector3::new(1.0, 0.0, 0.0),
-                    },
+                eval_points[0].clone(),
+                SingularityParams::Stokeslet {
+                    a: Vector3::new(1.0, 0.0, 0.0),
                 },
             ),
             (
-                1,
-                Singularity {
-                    point: Point3::new(1.0, 0.0, 0.0),
-                    params: SingularityParams::Stokeslet {
-                        a: Vector3::new(-1.0, 0.0, 0.0),
-                    },
+                eval_points[1].clone(),
+                SingularityParams::Stokeslet {
+                    a: Vector3::new(-1.0, 0.0, 0.0),
                 },
             ),
         ];
@@ -181,7 +170,7 @@ mod tests {
         let gpu_context = CudaFluidContext::new(
             eval_points.len() as u32,
             singularities.len() as u32,
-            boundary_config,
+            &boundary_config,
             32,
         );
 
