@@ -9,7 +9,8 @@ use crate::{
 
 use super::interface::{
     boundary_config_to_c, fluid_evaluate, fluid_finalize, fluid_init, object_point_to_c, v3_as_vec,
-    vec_as_V3, zero_v3_pair, FluidDeviceData, ObjectPoint, Stokeslet, V3Pair,
+    vec_as_V3, zero_v3_pair, FluidDeviceData, ObjectPoint, Singularity, SingularityType_ROTLET,
+    SingularityType_STOKESLET, V3Pair,
 };
 
 pub struct CudaFluidContext {
@@ -64,19 +65,24 @@ impl CudaFluidContext {
         let mut eval_points_c: Vec<ObjectPoint> =
             eval_points.iter().map(|op| object_point_to_c(op)).collect();
 
-        let mut stokeslets_c: Vec<Stokeslet> = singularities
+        let mut stokeslets_c: Vec<Singularity> = singularities
             .iter()
             .map(|(object_pt, params)| {
                 let object_point = object_point_to_c(object_pt);
                 match params {
-                    SingularityParams::Stokeslet { a } => Stokeslet {
+                    SingularityParams::Stokeslet { a } => Singularity {
                         object_point,
-                        force: vec_as_V3(*a),
+                        strength: vec_as_V3(*a),
+                        singularity_type: SingularityType_STOKESLET,
                     },
                     SingularityParams::StokesDoublet { a: _, b: _ } => {
                         panic!("StokesDoublet not supported")
                     }
-                    SingularityParams::Rotlet { c: _ } => panic!("Rotlet not supported"),
+                    SingularityParams::Rotlet { c } => Singularity {
+                        object_point,
+                        strength: vec_as_V3(*c),
+                        singularity_type: SingularityType_ROTLET,
+                    },
                     SingularityParams::Stresslet { a: _, b: _ } => {
                         panic!("Stresslet not supported")
                     }

@@ -67,18 +67,18 @@ pub struct FlowMarkerId(pub usize);
 pub fn add_flow_markers(
     mut commands: Commands,
     setup_config: Res<SetupConfigRes>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    // mut meshes: ResMut<Assets<Mesh>>,
+    // mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Marker bases.
-    let red: Handle<StandardMaterial> = materials.add(StandardMaterial::from(Color::RED));
-    let cube: Handle<Mesh> = meshes.add((shape::Cube { size: 0.1 }).into()).into();
+    // let red: Handle<StandardMaterial> = materials.add(StandardMaterial::from(Color::RED));
+    // let cube: Handle<Mesh> = meshes.add((shape::Cube { size: 1.0 }).into()).into();
 
     for (i, sample) in setup_config.0.sample_points.iter().enumerate() {
         commands.spawn((
             PbrBundle {
-                mesh: cube.clone(),
-                material: red.clone(),
+                // mesh: cube.clone(),
+                // material: red.clone(),
                 transform: Transform::from_translation(point3_to_gvec3(&sample)),
                 ..default()
             },
@@ -380,7 +380,7 @@ fn main() {
 
     let env = Environment {
         boundaries: Some(setup.parameters.boundaries.clone()),
-        arrow_length: 2.0,
+        arrow_length: 0.5,
     };
 
     info!("Got {} sim-states", sim_states.len());

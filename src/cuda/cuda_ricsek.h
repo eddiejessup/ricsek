@@ -59,20 +59,26 @@ extern "C"
 
 // Fluid
 
+typedef enum {
+    STOKESLET,
+    ROTLET
+} SingularityType;
+
 typedef struct
 {
   ObjectPoint object_point;
-  V3 force;
-} Stokeslet;
+  V3 strength;
+  SingularityType singularity_type;
+} Singularity;
 
 typedef struct
 {
   ObjectPoint *eval_points;
   unsigned int num_eval_points;
   unsigned int eval_points_size;
-  Stokeslet *stokeslets;
-  unsigned int num_stokeslets;
-  unsigned int stokeslets_size;
+  Singularity *singularities;
+  unsigned int num_singularities;
+  unsigned int singularities_size;
   V3Pair *pairwise_twists;
   unsigned int pairwise_twists_size;
   V3Pair *eval_point_twists;
@@ -83,9 +89,9 @@ typedef struct
 extern "C"
 {
 #endif
-  FluidDeviceData *fluid_init(unsigned int num_eval_points, unsigned int num_stokeslets, BoundaryConfig bc);
+  FluidDeviceData *fluid_init(unsigned int num_eval_points, unsigned int num_singularities, BoundaryConfig bc);
 
-  void fluid_evaluate(FluidDeviceData *device_data, ObjectPoint *eval_points, Stokeslet *stokeslets, V3Pair *eval_point_twists, unsigned int threads_per_block_axis);
+  void fluid_evaluate(FluidDeviceData *device_data, ObjectPoint *eval_points, Singularity *singularities, V3Pair *eval_point_twists, unsigned int threads_per_block_axis);
 
   void fluid_finalize(FluidDeviceData *device_data);
 

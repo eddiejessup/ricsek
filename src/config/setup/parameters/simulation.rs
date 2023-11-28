@@ -21,6 +21,7 @@ pub struct SimParams {
     //   the fluid. i.e. this depends on the fluid's viscosity. Not physically
     //   independent, but can be in simulation terms.
     pub agent_propulsive_stokeslet_strength: f64,
+    pub agent_propulsive_rotlet_strength: f64,
     // Agent thermal noise.
     pub agent_translational_diffusion_coefficient: f64,
     pub agent_rotational_diffusion_coefficient: f64,

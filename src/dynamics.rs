@@ -48,11 +48,25 @@ pub fn agent_singularities(sim_params: &SimParams, agent: &Agent) -> Vec<Singula
             },
         },
         Singularity {
+            point: agent.seg.start,
+            params: SingularityParams::Rotlet {
+                c: agent
+                    .u()
+                    .scale(-sim_params.agent_propulsive_rotlet_strength),
+            },
+        },
+        Singularity {
             point: agent.seg.end,
             params: SingularityParams::Stokeslet {
                 a: agent
                     .u()
                     .scale(sim_params.agent_propulsive_stokeslet_strength),
+            },
+        },
+        Singularity {
+            point: agent.seg.end,
+            params: SingularityParams::Rotlet {
+                c: agent.u().scale(sim_params.agent_propulsive_rotlet_strength),
             },
         },
     ]

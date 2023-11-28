@@ -32,6 +32,7 @@ pub struct PhysicalParams {
     // Force the agent applies to the fluid through its propulsion.
     // (Used to compute the agent's empty-fluid velocity.)
     pub agent_propulsion_force: f64,
+    pub agent_propulsion_torque: f64,
     pub enable_agent_propulsion: bool,
 }
 
@@ -85,6 +86,10 @@ impl PhysicalParams {
         self.agent_propulsion_force / (8.0 * PI * self.fluid_viscosity)
     }
 
+    pub fn agent_propulsive_rotlet_strength(&self) -> f64 {
+        self.agent_propulsion_torque / (8.0 * PI * self.fluid_viscosity)
+    }
+
     fn thermal_energy(&self) -> f64 {
         // Boltzmann in length-units of microns.
         1e12 * physical_constants::BOLTZMANN_CONSTANT * self.fluid_temperature
@@ -115,6 +120,7 @@ impl PhysicalParams {
             agent_rotational_mobility: self.agent_stokes_rotational_mobility(),
             agent_propulsion_force: self.agent_propulsion_force,
             agent_propulsive_stokeslet_strength: self.agent_propulsive_stokeslet_strength(),
+            agent_propulsive_rotlet_strength: self.agent_propulsive_rotlet_strength(),
             agent_translational_diffusion_coefficient: self
                 .agent_stokes_translational_diffusion_coefficient(),
             agent_rotational_diffusion_coefficient: self

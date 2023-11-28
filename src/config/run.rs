@@ -22,7 +22,7 @@ pub struct RunContext {
 
 impl RunContext {
     pub fn new(sim_params: &SimParams, n_agents: usize, sample_points: Vec<Point3<f64>>) -> Self {
-        let n_singularities = 2 * n_agents as u32; // TODO: Assume two stokeslets per agent for now.
+        let n_singularities = 4 * n_agents as u32; // TODO: Assume two stokeslets per agent for now.
 
         let gpu_fluid_agent_context = cuda::fluid::CudaFluidContext::new(
             n_agents as u32,
