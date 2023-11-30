@@ -1,12 +1,13 @@
 use core::panic;
 
-use nalgebra::{Matrix3, Vector3};
+use log::warn;
+use nalgebra::{zero, Matrix3, Vector3};
 
 // r is the vector pointing from the singularity to the point of interest.
 
 fn safe_magnitude(r: Vector3<f64>) -> f64 {
     let rm = r.magnitude();
-    if rm < 1e-10 {
+    if rm < 1e-20 {
         panic!("r is too small: {}", rm);
     } else {
         rm
@@ -69,7 +70,8 @@ pub fn stokes_doublet_chwang_vort(
     _b: Vector3<f64>,
     _r: Vector3<f64>,
 ) -> Vector3<f64> {
-    panic!("Not implemented");
+    warn!("Not implemented"); // HACK
+    zero()
 }
 
 pub fn rotlet_chwang_u(c: Vector3<f64>, r: Vector3<f64>) -> Vector3<f64> {
@@ -78,7 +80,8 @@ pub fn rotlet_chwang_u(c: Vector3<f64>, r: Vector3<f64>) -> Vector3<f64> {
 }
 
 pub fn rotlet_chwang_vort(_c: Vector3<f64>, _r: Vector3<f64>) -> Vector3<f64> {
-    panic!("Not implemented");
+    warn!("Not implemented"); // HACK
+    zero()
 }
 
 pub fn stresslet_chwang_u(a: Vector3<f64>, b: Vector3<f64>, r: Vector3<f64>) -> Vector3<f64> {
@@ -89,7 +92,8 @@ pub fn stresslet_chwang_u(a: Vector3<f64>, b: Vector3<f64>, r: Vector3<f64>) -> 
 }
 
 pub fn stresslet_chwang_vort(_a: Vector3<f64>, _b: Vector3<f64>, _r: Vector3<f64>) -> Vector3<f64> {
-    panic!("Not implemented");
+    warn!("Not implemented"); //
+    zero()
 }
 
 pub fn potential_doublet_chwang_u(d: Vector3<f64>, r: Vector3<f64>) -> Vector3<f64> {
@@ -100,5 +104,6 @@ pub fn potential_doublet_chwang_u(d: Vector3<f64>, r: Vector3<f64>) -> Vector3<f
 }
 
 pub fn potential_doublet_chwang_vort(_d: Vector3<f64>, _r: Vector3<f64>) -> Vector3<f64> {
-    panic!("Not implemented");
+    warn!("Not implemented"); //
+    zero()
 }

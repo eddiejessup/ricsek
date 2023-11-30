@@ -4,7 +4,6 @@ use bevy::prelude::*;
 #[derive(Resource)]
 pub struct Environment {
     pub boundaries: Option<BoundaryConfig>,
-    pub arrow_length: f64,
 }
 
 pub fn add_boundaries(

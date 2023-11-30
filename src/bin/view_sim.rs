@@ -380,7 +380,6 @@ fn main() {
 
     let env = Environment {
         boundaries: Some(setup.parameters.boundaries.clone()),
-        arrow_length: 0.5,
     };
 
     info!("Got {} sim-states", sim_states.len());
@@ -394,7 +393,7 @@ fn main() {
         .insert_resource(env)
         .insert_resource(SimStates(sim_states))
         .insert_resource(SetupConfigRes(setup))
-        .insert_resource(FlowViewState::new(0.0))
+        .insert_resource(FlowViewState::new())
         .insert_resource(SimViewState::default())
         .add_systems(Startup, add_camera)
         .add_systems(Startup, add_axis_arrows)

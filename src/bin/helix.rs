@@ -80,7 +80,6 @@ fn main() {
 
     let env = Environment {
         boundaries: None,
-        arrow_length: 2.0,
     };
 
     App::new()
@@ -90,7 +89,7 @@ fn main() {
             FrameTimeDiagnosticsPlugin::default(),
         ))
         .insert_resource(env)
-        .insert_resource(FlowViewState::new(0.0))
+        .insert_resource(FlowViewState::new())
         .add_systems(Startup, add_camera)
         .add_systems(Startup, add_axis_arrows)
         // .add_systems(PostStartup, flow::add_flow)

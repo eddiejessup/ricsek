@@ -3,7 +3,7 @@ use nalgebra::Vector3;
 
 use crate::view::common::vec3_to_gvec3;
 
-use super::{common::spawn_arrow, environment::Environment};
+use super::common::spawn_arrow;
 
 #[derive(Component, Clone)]
 pub struct VectorLabel(pub String);
@@ -17,14 +17,16 @@ pub struct FlowVector;
 #[derive(Resource)]
 pub struct FlowViewState {
     pub vector_statuses: [bool; 9],
+    pub max_arrow_length: f64,
     pub threshold: f64,
 }
 
 impl FlowViewState {
-    pub fn new(threshold: f64) -> Self {
+    pub fn new() -> Self {
         Self {
             vector_statuses: [false; 9],
-            threshold,
+            threshold: 0.0,
+            max_arrow_length: 1.0,
         }
     }
 }
@@ -46,6 +48,7 @@ pub fn add_flow(
         },
     ));
 
+    // let mut n_vsets = 0;
     for vset_entity in q_vsets.iter() {
         // Create a new material here, because we will in fact change the color
         // of the flow vector.
@@ -60,11 +63,13 @@ pub fn add_flow(
             .id();
 
         commands.entity(vset_entity).add_child(flow_vector_parent);
+
+        // n_vsets += 1;
     }
+    // info!("Added {} flow vector sets.", n_vsets);
 }
 
 pub fn update_flow(
-    env: Res<Environment>,
     flow_view_state: Res<FlowViewState>,
     q_vectorset: Query<(&VectorSet, &Children)>,
     mut q_flow_vectors: Query<(&mut Transform, &mut Visibility), With<FlowVector>>,
@@ -113,6 +118,7 @@ pub fn update_flow(
     let v_max_scale = 1.0;
 
     // Iterate over markers.
+    // let mut n_markers = 0;
     for (i, (_vs, vset_children)) in q_vectorset.iter().enumerate() {
         // Get the selected flow vector.
         let v = net_vs_and_labels[i].1;
@@ -121,7 +127,11 @@ pub fn update_flow(
         let mag_scale = (v.magnitude() / v_max_scale).min(1.0);
 
         // Set the scale of the arrow somewhere between 0 and env.arrow_length based on mag_scale value.
-        let arrow_scale = mag_scale * env.arrow_length;
+        let arrow_length = mag_scale * flow_view_state.max_arrow_length;
+        // info!(
+        //     "Magnitude scale: {}, Max arrow length: {}, Arrow scale: {}",
+        //     mag_scale, flow_view_state.max_arrow_length, arrow_length
+        // );
 
         for &vset_child in vset_children.iter() {
             let (mut transform, mut visibility) = match q_flow_vectors.get_mut(vset_child) {
@@ -131,6 +141,10 @@ pub fn update_flow(
 
             // If the flow vector is too small, hide it.
             *visibility = if mag_scale < flow_view_state.threshold {
+                // warn!(
+                //     "Flow vector is below threshold {}, hiding it.",
+                //     flow_view_state.threshold
+                // );
                 Visibility::Hidden
             } else {
                 Visibility::Visible
@@ -139,18 +153,28 @@ pub fn update_flow(
             // Set the orientation of the overall flow-vector.
             match vec3_to_gvec3(&v).try_normalize() {
                 Some(glam_u) => {
-                    *transform = Transform::from_scale(Vec3::splat(arrow_scale as f32))
-                        .looking_to(glam_u, Vec3::Z)
+                    if arrow_length > 1e-2 {
+                        // info!("Setting arrow length to {}", arrow_length);
+                        *transform = Transform::from_scale(Vec3::splat(arrow_length as f32))
+                            .looking_to(glam_u, Vec3::Z)
+                    } else {
+                        // warn!("Arrow length is very small, hiding it.");
+                        *visibility = Visibility::Hidden;
+                    }
                 }
                 None => {
                     *visibility = Visibility::Hidden;
+                    // warn!("Flow vector is zero, hiding it.");
                 }
             };
         }
+
+        // n_markers += 1;
     }
+    // info!("Updated {} flow vectors.", n_markers);
 }
 
-pub fn change_view(keyboard_input: Res<Input<KeyCode>>, mut view_state: ResMut<FlowViewState>) {
+pub fn change_view(keys: Res<Input<KeyCode>>, mut view_state: ResMut<FlowViewState>) {
     let entries = [
         (KeyCode::Key1, 0),
         (KeyCode::Key2, 1),
@@ -163,8 +187,28 @@ pub fn change_view(keyboard_input: Res<Input<KeyCode>>, mut view_state: ResMut<F
         (KeyCode::Key9, 8),
     ];
     for (keycode, ix) in entries {
-        if keyboard_input.just_pressed(keycode) {
+        if keys.just_pressed(keycode) {
             view_state.vector_statuses[ix] = !view_state.vector_statuses[ix];
         }
+    }
+    // If t/shift+t is pressed, bump the threshold up/down.
+    if keys.just_pressed(KeyCode::T) {
+        view_state.threshold += 0.1
+            * if keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
+                -1.0
+            } else {
+                1.0
+            };
+        view_state.threshold = view_state.threshold.max(0.0);
+    }
+    // If l/shift+l is pressed, bump the arrow length up/down.
+    if keys.just_pressed(KeyCode::L) {
+        view_state.max_arrow_length *= 1.1_f64.powi(
+            if keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
+                -1
+            } else {
+                1
+            },
+        );
     }
 }

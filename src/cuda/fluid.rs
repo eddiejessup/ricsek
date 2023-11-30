@@ -3,14 +3,14 @@ use core::panic;
 use nalgebra::Vector3;
 
 use crate::{
-    config::setup::parameters::{common::BoundaryConfig, singularities::SingularityParams},
+    config::setup::parameters::{common::BoundaryConfig, singularities},
     geometry::point,
 };
 
 use super::interface::{
-    boundary_config_to_c, fluid_evaluate, fluid_finalize, fluid_init, object_point_to_c, v3_as_vec,
-    vec_as_V3, zero_v3_pair, FluidDeviceData, ObjectPoint, Singularity, SingularityType_ROTLET,
-    SingularityType_STOKESLET, V3Pair,
+    self, boundary_config_to_c, fluid_evaluate, fluid_finalize, fluid_init, object_point_to_c,
+    v3_as_vec, vec_as_V3, zero_v3_pair, FluidDeviceData, ObjectPoint, Singularity,
+    SingularityParams, V3Pair,
 };
 
 pub struct CudaFluidContext {
@@ -45,7 +45,7 @@ impl CudaFluidContext {
     pub fn evaluate(
         &self,
         eval_points: &[point::ObjectPoint],
-        singularities: &[(point::ObjectPoint, SingularityParams)],
+        singularities: &[(point::ObjectPoint, singularities::SingularityParams)],
     ) -> Vec<(Vector3<f64>, Vector3<f64>)> {
         if eval_points.len() as u32 != self.num_eval_points {
             panic!(
@@ -70,24 +70,52 @@ impl CudaFluidContext {
             .map(|(object_pt, params)| {
                 let object_point = object_point_to_c(object_pt);
                 match params {
-                    SingularityParams::Stokeslet { a } => Singularity {
+                    singularities::SingularityParams::Stokeslet { a } => interface::Singularity {
                         object_point,
-                        strength: vec_as_V3(*a),
-                        singularity_type: SingularityType_STOKESLET,
+                        singularity_type: interface::SingularityType_STOKESLET,
+                        params: SingularityParams {
+                            strength: vec_as_V3(*a),
+                        },
                     },
-                    SingularityParams::StokesDoublet { a: _, b: _ } => {
-                        panic!("StokesDoublet not supported")
+                    singularities::SingularityParams::StokesDoublet { a, b } => {
+                        interface::Singularity {
+                            object_point,
+                            singularity_type: interface::SingularityType_STOKES_DOUBLET,
+                            params: SingularityParams {
+                                components: V3Pair {
+                                    a: vec_as_V3(*a),
+                                    b: vec_as_V3(*b),
+                                },
+                            },
+                        }
                     }
-                    SingularityParams::Rotlet { c } => Singularity {
+                    singularities::SingularityParams::Rotlet { c } => interface::Singularity {
                         object_point,
-                        strength: vec_as_V3(*c),
-                        singularity_type: SingularityType_ROTLET,
+                        singularity_type: interface::SingularityType_ROTLET,
+                        params: SingularityParams {
+                            strength: vec_as_V3(*c),
+                        },
                     },
-                    SingularityParams::Stresslet { a: _, b: _ } => {
-                        panic!("Stresslet not supported")
+                    singularities::SingularityParams::Stresslet { a, b } => {
+                        interface::Singularity {
+                            object_point,
+                            singularity_type: interface::SingularityType_STRESSLET,
+                            params: SingularityParams {
+                                components: V3Pair {
+                                    a: vec_as_V3(*a),
+                                    b: vec_as_V3(*b),
+                                },
+                            },
+                        }
                     }
-                    SingularityParams::PotentialDoublet { d: _ } => {
-                        panic!("PotentialDoublet not supported")
+                    singularities::SingularityParams::PotentialDoublet { d } => {
+                        interface::Singularity {
+                            object_point,
+                            singularity_type: interface::SingularityType_POTENTIAL_DOUBLET,
+                            params: SingularityParams {
+                                strength: vec_as_V3(*d),
+                            },
+                        }
                     }
                 }
             })
@@ -130,7 +158,7 @@ mod tests {
     use crate::{
         config::setup::parameters::{
             common::{AxisBoundaryConfig, BoundaryConfig},
-            singularities::{singularities_fluid_v_multi, SingularityParams},
+            singularities::{self, singularities_fluid_v_multi},
         },
         geometry::point,
     };
@@ -161,13 +189,13 @@ mod tests {
         let singularities = vec![
             (
                 eval_points[0].clone(),
-                SingularityParams::Stokeslet {
+                singularities::SingularityParams::Stokeslet {
                     a: Vector3::new(1.0, 0.0, 0.0),
                 },
             ),
             (
                 eval_points[1].clone(),
-                SingularityParams::Stokeslet {
+                singularities::SingularityParams::Stokeslet {
                     a: Vector3::new(-1.0, 0.0, 0.0),
                 },
             ),

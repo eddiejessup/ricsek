@@ -8,8 +8,9 @@ pub mod stokes_solutions;
 use std::f64::consts::PI;
 
 use crate::config::run::{RunContext, RunParams};
+use crate::config::setup::parameters::common::BoundaryConfig;
 use crate::config::setup::parameters::simulation::SimParams;
-use crate::config::setup::parameters::singularities::{Singularity, SingularityParams};
+use crate::config::setup::parameters::singularities::SingularityParams;
 use crate::dynamics::common::zero_wrench;
 use crate::geometry::line_segment::LineSegment;
 use crate::geometry::point::{random_vector, ObjectPoint};
@@ -37,62 +38,145 @@ pub struct StepSummary {
     pub fluid_flow: Vec<Vector3<f64>>,
 }
 
-pub fn agent_singularities(sim_params: &SimParams, agent: &Agent) -> Vec<Singularity> {
-    vec![
-        Singularity {
-            point: agent.seg.start,
-            params: SingularityParams::Stokeslet {
+pub fn get_singularity_image(
+    p: &ObjectPoint,
+    params: &SingularityParams,
+    boundaries: &BoundaryConfig,
+) -> Vec<(ObjectPoint, SingularityParams)> {
+    if boundaries.0.y.closed {
+        panic!("Closed boundaries not supported along y");
+    }
+    if boundaries.0.z.closed {
+        panic!("Closed boundaries not supported along y");
+    }
+    if !boundaries.0.x.closed {
+        return Vec::new();
+    }
+
+    let r_sing_plane: Vector3<f64> = Vector3::new(boundaries.0.x.l_half() - p.position.x, 0.0, 0.0);
+
+    let length_sing_plane = r_sing_plane.norm();
+
+    let image_param_sets = match params {
+        SingularityParams::Stokeslet { a } => {
+            // https://sci-hub.ee/10.1017/S0305004100049902
+            vec![
+                // SingularityParams::Stokeslet { a: -a },
+                // SingularityParams::StokesDoublet {
+                //     a: 2.0 * length_sing_plane * a,
+                //     b: -r_sing_plane.normalize(),
+                // },
+                SingularityParams::PotentialDoublet {
+                    d: -2.0 * length_sing_plane.powi(2) * a,
+                },
+            ]
+        }
+        SingularityParams::StokesDoublet { a: _, b: _ } => {
+            panic!("StokesDoublet not supported")
+        }
+        SingularityParams::Rotlet { c: _ } => {
+            panic!("Rotlet not supported")
+        }
+        SingularityParams::Stresslet { a: _, b: _ } => {
+            panic!("Stresslet not supported")
+        }
+        SingularityParams::PotentialDoublet { d: _ } => {
+            panic!("PotentialDoublet not supported")
+        }
+    };
+
+    image_param_sets
+        .iter()
+        .map(|params| {
+            (
+                ObjectPoint {
+                    object_id: std::u32::MAX - 1,
+                    position_com: p.position_com + 2.0 * r_sing_plane,
+                    position: p.position + 2.0 * r_sing_plane,
+                },
+                params.clone(),
+            )
+        })
+        .collect()
+}
+
+pub fn agent_singularities(
+    sim_params: &SimParams,
+    agent: &Agent,
+    i_agent: u32,
+    boundaries: &BoundaryConfig,
+) -> Vec<(ObjectPoint, SingularityParams)> {
+    let base_singularities = vec![
+        (
+            ObjectPoint {
+                object_id: i_agent,
+                position_com: agent.seg.centroid(),
+                position: agent.seg.start,
+            },
+            SingularityParams::Stokeslet {
                 a: agent
                     .u()
                     .scale(-sim_params.agent_propulsive_stokeslet_strength),
             },
-        },
-        Singularity {
-            point: agent.seg.start,
-            params: SingularityParams::Rotlet {
-                c: agent
-                    .u()
-                    .scale(-sim_params.agent_propulsive_rotlet_strength),
-            },
-        },
-        Singularity {
-            point: agent.seg.end,
-            params: SingularityParams::Stokeslet {
-                a: agent
-                    .u()
-                    .scale(sim_params.agent_propulsive_stokeslet_strength),
-            },
-        },
-        Singularity {
-            point: agent.seg.end,
-            params: SingularityParams::Rotlet {
-                c: agent.u().scale(sim_params.agent_propulsive_rotlet_strength),
-            },
-        },
-    ]
+        ),
+        // (
+        //     ObjectPoint {
+        //         object_id: i_agent,
+        //         position_com: agent.seg.centroid(),
+        //         position: agent.seg.start,
+        //     },
+        //     SingularityParams::Rotlet {
+        //         c: agent
+        //             .u()
+        //             .scale(-sim_params.agent_propulsive_rotlet_strength),
+        //     },
+        // ),
+        // (
+        //     ObjectPoint {
+        //         object_id: i_agent,
+        //         position_com: agent.seg.centroid(),
+        //         position: agent.seg.end,
+        //     },
+        //     SingularityParams::Stokeslet {
+        //         a: agent
+        //             .u()
+        //             .scale(sim_params.agent_propulsive_stokeslet_strength),
+        //     },
+        // ),
+        // (
+        //     ObjectPoint {
+        //         object_id: i_agent,
+        //         position_com: agent.seg.centroid(),
+        //         position: agent.seg.end,
+        //     },
+        //     SingularityParams::Rotlet {
+        //         c: agent.u().scale(sim_params.agent_propulsive_rotlet_strength),
+        //     },
+        // ),
+    ];
+
+    let image_singularities: Vec<_> = base_singularities
+        .iter()
+        .flat_map(|(p, params)| get_singularity_image(p, params, boundaries))
+        .collect();
+
+    // Return the concatenation of base and image.
+    base_singularities
+        .into_iter()
+        .chain(image_singularities.into_iter())
+        .collect()
 }
 
 pub fn agents_singularities(
     sim_params: &SimParams,
     agents: &[Agent],
+    boundaries: &BoundaryConfig,
 ) -> Vec<(ObjectPoint, SingularityParams)> {
     agents
         .iter()
         .enumerate()
         .flat_map(|(i_agent, agent)| {
-            agent_singularities(sim_params, agent)
-                .iter()
-                .map(|singularity| {
-                    (
-                        ObjectPoint {
-                            object_id: i_agent as u32,
-                            position_com: agent.seg.centroid(),
-                            position: singularity.point,
-                        },
-                        singularity.params.clone(),
-                    )
-                })
-                .collect::<Vec<_>>()
+            agent_singularities(sim_params, agent, i_agent as u32, boundaries)
         })
         .collect()
 }
@@ -143,7 +227,8 @@ pub fn update(
     };
 
     let (fluid_twists_at_agents, fluid_flow): (Vec<_>, Vec<_>) = if sim_params.enable_fluid {
-        let agent_singularities = agents_singularities(sim_params, &sim_state.agents);
+        let agent_singularities =
+            agents_singularities(sim_params, &sim_state.agents, &sim_params.boundaries);
 
         let agent_eval_points: Vec<_> = sim_state
             .agents

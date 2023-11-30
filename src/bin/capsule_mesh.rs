@@ -141,7 +141,6 @@ fn add_mesh(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     faces: Res<TriangleSet>,
-    env: Res<Environment>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
@@ -158,6 +157,7 @@ fn add_mesh(
 
     let f = 1.0;
     let g = 0.1;
+    let arrow_length = 0.025;
 
     // Max magnitude.
     let v_mag_max = faces
@@ -177,7 +177,7 @@ fn add_mesh(
                 commands
                     .spawn(SpatialBundle {
                         transform: Transform::from_translation(point3_to_gvec3(&centroid))
-                            .with_scale(Vec3::splat((env.arrow_length * g) as f32))
+                            .with_scale(Vec3::splat((arrow_length * g) as f32))
                             .looking_to(glam_u, Vec3::Z),
                         ..default()
                     })
@@ -196,7 +196,7 @@ fn add_mesh(
                 commands
                     .spawn(SpatialBundle {
                         transform: Transform::from_translation(point3_to_gvec3(&centroid))
-                            .with_scale(Vec3::splat((env.arrow_length * f * v_mag) as f32))
+                            .with_scale(Vec3::splat((arrow_length * f * v_mag) as f32))
                             .looking_to(glam_u, Vec3::Z),
                         ..default()
                     })
@@ -388,10 +388,7 @@ fn main() {
     info!("Total torque: {}", total_torque);
 
     info!("Drawing");
-    let env = Environment {
-        boundaries: None,
-        arrow_length: 0.025,
-    };
+    let env = Environment { boundaries: None };
 
     // Zip mesh_faces with stresses.
     let triangles = mesh_faces

@@ -3,7 +3,7 @@ parameters:
   dt: 0.001
   boundaries:
     - l: 40
-      closed: false
+      closed: true
     - l: 40
       closed: false
     - l: 40

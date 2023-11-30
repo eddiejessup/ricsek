@@ -43,7 +43,6 @@ typedef struct
   unsigned int net_wrenches_size;
 } ElectroDeviceData;
 
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -59,16 +58,26 @@ extern "C"
 
 // Fluid
 
-typedef enum {
-    STOKESLET,
-    ROTLET
+typedef enum
+{
+  STOKESLET,
+  STOKES_DOUBLET,
+  ROTLET,
+  STRESSLET,
+  POTENTIAL_DOUBLET,
 } SingularityType;
+
+typedef union
+  {
+    V3 strength;
+    V3Pair components;
+} SingularityParams;
 
 typedef struct
 {
   ObjectPoint object_point;
-  V3 strength;
   SingularityType singularity_type;
+  SingularityParams params;
 } Singularity;
 
 typedef struct

@@ -4,6 +4,41 @@
 
 __constant__ BoundaryConfig d_bc;
 
+__host__ __device__ V3 evaluateStokesletV(V3 strength, V3 r, float r_length)
+{
+  // (a / |r|) + (a.dot(r) * r / |r|^3)
+  V3 v_f = scale(strength, 1.0 / r_length);
+  V3 v_r = scale(r, dot(strength, r) / (r_length * r_length * r_length));
+  return add(v_f, v_r);
+}
+
+__host__ __device__ V3 evaluateRotletV(V3 strength, V3 r, float r_length)
+{
+  return scale(cross(strength, r), 1.0 / (r_length * r_length * r_length));
+}
+
+__host__ __device__ V3 evaluateStressletV(V3 a, V3 b, V3 r, float r_length)
+{
+  float term_1 = -dot(a, b) / (r_length * r_length * r_length);
+  float term_2 = 3.0 * dot(a, r) * dot(b, r) / (r_length * r_length * r_length * r_length * r_length);
+  return scale(r, term_1 + term_2);
+}
+
+__host__ __device__ V3 evaluatePotentialDoubletV(V3 d, V3 r, float r_length)
+{
+  V3 v_1 = scale(d, -1.0 / (r_length * r_length * r_length));
+  V3 v_2 = scale(r, 3.0 * dot(d, r) / (r_length * r_length * r_length * r_length * r_length));
+  return add(v_1, v_2);
+}
+
+__host__ __device__ V3 evaluateStokesDoubletV(V3 a, V3 b, V3 r, float r_length)
+{
+  V3 c = cross(a, b);
+  V3 v_rot = evaluateRotletV(c, r, r_length);
+  V3 v_stress = evaluateStressletV(a, b, r, r_length);
+  return add(v_rot, v_stress);
+}
+
 __global__ void evaluateSingularity(ObjectPoint *eval_points, Singularity *singularities, V3Pair *pairwise_twists, unsigned int num_eval_points, unsigned int num_singularities)
 {
   unsigned int eval_i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -24,23 +59,32 @@ __global__ void evaluateSingularity(ObjectPoint *eval_points, Singularity *singu
     // r is the vector pointing from the singularity to the point of interest.
     V3 r = minimum_image_vector_objs(eval_point, singularity.object_point, d_bc);
 
-    float r1 = length(r);
-    float r1_inv = 1.0 / r1;
-    float r3_inv = r1_inv * r1_inv * r1_inv;
+    float r_length = length(r);
 
     V3 v = zero_v3();
     if (singularity.singularity_type == STOKESLET)
     {
-      // (a / |r|) + (a.dot(r) * r / |r|^3)
-      float r_coeff = dot(singularity.strength, r) * r3_inv;
-      v = V3{
-          (r1_inv * singularity.strength.x) + (r_coeff * r.x),
-          (r1_inv * singularity.strength.y) + (r_coeff * r.y),
-          (r1_inv * singularity.strength.z) + (r_coeff * r.z)};
+      v = evaluateStokesletV(singularity.params.strength, r, r_length);
+    }
+    else if (singularity.singularity_type == STOKES_DOUBLET)
+    {
+      v = evaluateStokesDoubletV(singularity.params.components.a, singularity.params.components.b, r, r_length);
     }
     else if (singularity.singularity_type == ROTLET)
     {
-      v = scale(cross(singularity.strength, r), r3_inv);
+      v = evaluateRotletV(singularity.params.strength, r, r_length);
+    }
+    else if (singularity.singularity_type == STRESSLET)
+    {
+      v = evaluateStressletV(singularity.params.components.a, singularity.params.components.b, r, r_length);
+    }
+    else if (singularity.singularity_type == POTENTIAL_DOUBLET)
+    {
+      v = evaluatePotentialDoubletV(singularity.params.strength, r, r_length);
+    }
+    else
+    {
+      printf("Unknown singularity type: %d\n", singularity.singularity_type);
     }
     pairwise_twists[pair_idx].a = v;
   }
