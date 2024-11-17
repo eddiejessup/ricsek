@@ -99,8 +99,6 @@ fn stokeslet_image(
         zero()
     };
 
-    // Want to distribute force between the two components of the stokes
-    // doublet, so make each equal to sqrt of the desired strength.
     let stokes_doublet_normal_mag = (2.0 * h * stokeslet_strength_normal).sqrt();
     let stokes_doublet_tangent_mag = (2.0 * h * stokeslet_strength_tangent).sqrt();
     let potential_doublet_mag = 2.0 * h.powi(2);
@@ -192,14 +190,15 @@ fn main() {
     // let stokeslet_force = Vector3::new(-stokeslet_strength, 0.0, 0.0);
     // let stokeslet_force = Vector3::new(0.0, stokeslet_strength, 0.0);
     // let stokeslet_force = Vector3::new(0.0, -stokeslet_strength, 0.0);
-    let stokeslet_force = Vector3::new(1.0, 1.0, 1.0).normalize() * stokeslet_strength;
+    // let stokeslet_force = Vector3::new(1.0, 1.0, 1.0).normalize() * stokeslet_strength;
+    let stokeslet_force = Vector3::new(1.0, 1.0, 0.0).normalize() * stokeslet_strength;
 
-    let stokeslet_origin_point = Point3::origin();
+    let stokeslet_origin_point = Point3::new(0.0, 0.0, 2.0);
     let stokeslet_origin = Singularity {
         point: stokeslet_origin_point,
         params: SingularityParams::Stokeslet { a: stokeslet_force },
     };
-    let d = Vector3::new(0.0, 0.0, bc.0.z.l_half());
+    let d = Vector3::new(0.0, 0.0, bc.0.z.l_half() - stokeslet_origin_point.z);
 
     let mut singularities: Vec<(flow::VectorLabel, Singularity)> =
         vec![(flow::VectorLabel(String::from("Origin")), stokeslet_origin)];
@@ -213,7 +212,11 @@ fn main() {
             vs: flow::VectorSet(
                 singularities
                     .iter()
-                    .map(|(label, s)| (label.clone(), s.eval(*r).0))
+                    .map(|(label, s)| {
+                      let v = s.eval(*r).0;
+                      println!("{}: {}", label.0, v);
+                      (label.clone(), v)
+        })
                     .collect(),
             ),
         })

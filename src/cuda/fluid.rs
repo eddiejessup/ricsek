@@ -136,7 +136,30 @@ impl CudaFluidContext {
 
         eval_point_twists_c
             .iter()
-            .map(|twist| (v3_as_vec(twist.a), v3_as_vec(twist.b)))
+            .map(|twist| {
+                // Check if any component is NaN or non-finite, and panic if so.
+                if twist.a.x.is_nan()
+                    || twist.a.y.is_nan()
+                    || twist.a.z.is_nan()
+                    || twist.b.x.is_nan()
+                    || twist.b.y.is_nan()
+                    || twist.b.z.is_nan()
+                    || twist.a.x.is_infinite()
+                    || twist.a.y.is_infinite()
+                    || twist.a.z.is_infinite()
+                    || twist.b.x.is_infinite()
+                    || twist.b.y.is_infinite()
+                    || twist.b.z.is_infinite()
+                {
+                    panic!(
+                        "twist.a = {:?}, twist.b = {:?}",
+                        v3_as_vec(twist.a),
+                        v3_as_vec(twist.b)
+                    );
+                }
+
+                (v3_as_vec(twist.a), v3_as_vec(twist.b))
+            })
             .collect()
     }
 }

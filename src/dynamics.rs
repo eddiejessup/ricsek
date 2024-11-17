@@ -38,36 +38,63 @@ pub struct StepSummary {
     pub fluid_flow: Vec<Vector3<f64>>,
 }
 
-pub fn get_singularity_image(
-    p: &ObjectPoint,
+pub fn get_singularity_image_across_plane(
+    d: Vector3<f64>,
     params: &SingularityParams,
-    boundaries: &BoundaryConfig,
-) -> Vec<(ObjectPoint, SingularityParams)> {
-    if boundaries.0.y.closed {
-        panic!("Closed boundaries not supported along y");
-    }
-    if boundaries.0.z.closed {
-        panic!("Closed boundaries not supported along y");
-    }
-    if !boundaries.0.x.closed {
-        return Vec::new();
+) -> Vec<SingularityParams> {
+    let h = d.norm();
+    if h < 1e-12 {
+        panic!("d is too small");
     }
 
-    let r_sing_plane: Vector3<f64> = Vector3::new(boundaries.0.x.l_half() - p.position.x, 0.0, 0.0);
+    let d_direction = d.normalize();
 
-    let length_sing_plane = r_sing_plane.norm();
+    match params {
+        SingularityParams::Stokeslet { a: stokeslet_force } => {
+            let stokeslet_force_normal = (stokeslet_force.dot(&d) / h.powi(2)) * d;
+            let stokeslet_force_tangent = stokeslet_force - stokeslet_force_normal;
 
-    let image_param_sets = match params {
-        SingularityParams::Stokeslet { a } => {
+            let stokeslet_strength_normal = stokeslet_force_normal.norm();
+            let stokeslet_strength_tangent = stokeslet_force_tangent.norm();
+
+            let stokeslet_direction_normal = if stokeslet_strength_normal > 0.0 {
+                stokeslet_force_normal.normalize()
+            } else {
+                zero()
+            };
+            let stokeslet_direction_tangent = if stokeslet_strength_tangent > 0.0 {
+                stokeslet_force_tangent.normalize()
+            } else {
+                zero()
+            };
+
+            let stokes_doublet_normal_mag = (2.0 * h * stokeslet_strength_normal).sqrt();
+            let stokes_doublet_tangent_mag = (2.0 * h * stokeslet_strength_tangent).sqrt();
+            let potential_doublet_mag = 2.0 * h.powi(2);
+
             // https://sci-hub.ee/10.1017/S0305004100049902
             vec![
-                // SingularityParams::Stokeslet { a: -a },
-                // SingularityParams::StokesDoublet {
-                //     a: 2.0 * length_sing_plane * a,
-                //     b: -r_sing_plane.normalize(),
-                // },
+                // Stokeslet
+                SingularityParams::Stokeslet {
+                    a: -stokeslet_force,
+                },
+                // Stokes doublet, normal
+                SingularityParams::StokesDoublet {
+                    a: -stokes_doublet_normal_mag * stokeslet_direction_normal,
+                    b: -stokes_doublet_normal_mag * d_direction,
+                },
+                // Potential doublet, normal
                 SingularityParams::PotentialDoublet {
-                    d: -2.0 * length_sing_plane.powi(2) * a,
+                    d: potential_doublet_mag * stokeslet_force_normal,
+                },
+                // Stokes doublet, tangential
+                SingularityParams::StokesDoublet {
+                    a: -stokes_doublet_tangent_mag * stokeslet_direction_tangent,
+                    b: stokes_doublet_tangent_mag * d_direction,
+                },
+                // Potential doublet, tangential
+                SingularityParams::PotentialDoublet {
+                    d: -potential_doublet_mag * stokeslet_force_tangent,
                 },
             ]
         }
@@ -83,21 +110,55 @@ pub fn get_singularity_image(
         SingularityParams::PotentialDoublet { d: _ } => {
             panic!("PotentialDoublet not supported")
         }
-    };
+    }
+}
 
-    image_param_sets
+pub fn get_singularity_image(
+    p: &ObjectPoint,
+    params: &SingularityParams,
+    boundaries: &BoundaryConfig,
+) -> Vec<(ObjectPoint, SingularityParams)> {
+    let param_sets_per_axis: Vec<Vec<(ObjectPoint, SingularityParams)>> = boundaries
+        .0
         .iter()
-        .map(|params| {
-            (
-                ObjectPoint {
-                    object_id: std::u32::MAX - 1,
-                    position_com: p.position_com + 2.0 * r_sing_plane,
-                    position: p.position + 2.0 * r_sing_plane,
-                },
-                params.clone(),
-            )
+        .enumerate()
+        .filter_map(|(i_axis, axis)| {
+            if axis.closed {
+                // Find the vector pointing to the nearest boundary along this axis.
+                let d = Vector3::ith(
+                    i_axis,
+                    if p.position_com[i_axis] > 0.0 {
+                        1.0
+                    } else {
+                        -1.0
+                    } * (axis.l_half() - p.position[i_axis]),
+                );
+                Some(
+                    get_singularity_image_across_plane(d, params)
+                        .iter()
+                        .map(|params| {
+                            (
+                                // Place each singularity on the opposite side of the boundary.
+                                ObjectPoint {
+                                    // ID to indicate fictional singularities.
+                                    object_id: std::u32::MAX - 1,
+                                    position_com: p.position_com + 2.0 * d,
+                                    position: p.position + 2.0 * d,
+                                },
+                                params.clone(),
+                            )
+                        })
+                        .collect(),
+                )
+            } else {
+                None
+            }
         })
-        .collect()
+        .collect();
+    if param_sets_per_axis.len() > 1 {
+        panic!("More than one boundary is closed");
+    }
+    param_sets_per_axis.iter().cloned().flatten().collect()
 }
 
 pub fn agent_singularities(
@@ -131,18 +192,18 @@ pub fn agent_singularities(
         //             .scale(-sim_params.agent_propulsive_rotlet_strength),
         //     },
         // ),
-        // (
-        //     ObjectPoint {
-        //         object_id: i_agent,
-        //         position_com: agent.seg.centroid(),
-        //         position: agent.seg.end,
-        //     },
-        //     SingularityParams::Stokeslet {
-        //         a: agent
-        //             .u()
-        //             .scale(sim_params.agent_propulsive_stokeslet_strength),
-        //     },
-        // ),
+        (
+            ObjectPoint {
+                object_id: i_agent,
+                position_com: agent.seg.centroid(),
+                position: agent.seg.end,
+            },
+            SingularityParams::Stokeslet {
+                a: agent
+                    .u()
+                    .scale(sim_params.agent_propulsive_stokeslet_strength),
+            },
+        ),
         // (
         //     ObjectPoint {
         //         object_id: i_agent,
@@ -244,7 +305,6 @@ pub fn update(
             .gpu_fluid_agent_context
             .evaluate(&agent_eval_points, &agent_singularities);
 
-        // let fluid_flow = vec![zero(); run_context.sample_eval_points.len()];
         let fluid_flow = run_context
             .gpu_fluid_sample_context
             .evaluate(&run_context.sample_eval_points, &agent_singularities)

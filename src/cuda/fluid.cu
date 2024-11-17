@@ -60,6 +60,10 @@ __global__ void evaluateSingularity(ObjectPoint *eval_points, Singularity *singu
     V3 r = minimum_image_vector_objs(eval_point, singularity.object_point, d_bc);
 
     float r_length = length(r);
+    if (isnan(r_length) || isinf(r_length) || r_length < 1e-6)
+    {
+      printf("Warning: NaN or infinite r_length detected. r=(%f, %f, %f), r_length=%f\n", r.x, r.y, r.z, r_length);
+    };
 
     V3 v = zero_v3();
     if (singularity.singularity_type == STOKESLET)
@@ -85,6 +89,11 @@ __global__ void evaluateSingularity(ObjectPoint *eval_points, Singularity *singu
     else
     {
       printf("Unknown singularity type: %d\n", singularity.singularity_type);
+    }
+    // Check if any component of v is NaN or infinite, and print a warning if so.
+    if (isnan(v.x) || isnan(v.y) || isnan(v.z) || isinf(v.x) || isinf(v.y) || isinf(v.z))
+    {
+      printf("Warning: NaN or infinite velocity component detected. Singularity type: %d\n", singularity.singularity_type);
     }
     pairwise_twists[pair_idx].a = v;
   }

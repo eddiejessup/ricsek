@@ -6,7 +6,7 @@ use std::{error::Error, fs::File, io::Read, path::Path};
 use log::info;
 use nalgebra::Point3;
 
-use crate::geometry::grid_3d;
+use crate::geometry::{arange, grid_2d, grid_3d, linspace};
 
 use self::{agents::AgentInitializationConfig, parameters::simulation::SimParams};
 
@@ -39,10 +39,28 @@ impl SetupConfig {
             parameters::ParametersYaml::Physical(physical_params) => physical_params.as_params(),
             parameters::ParametersYaml::Simulation(sim_params) => sim_params,
         };
-        let sample_points = grid_3d(
+
+        let mut sample_points = Vec::new();
+        sample_points.extend_from_slice(&grid_3d(
             parameters.boundaries.l(),
             config_raw.sampling.n_sample_points as usize,
+        ));
+        let sample_l = nalgebra::Vector2::new(
+            1.2 * parameters.boundaries.l().y,
+            1.2 * parameters.boundaries.l().z,
         );
+        let step = 2.0;
+        for sample_x in vec![parameters.boundaries.l_half().x] {
+        //   for sample_x in linspace(
+        //     parameters.boundaries.l_half().x - 4.0,
+        //     parameters.boundaries.l_half().x,
+        //     4,
+        // ) {
+            for p in grid_2d(sample_l, step) {
+                sample_points.push(Point3::new(sample_x, p.x, p.y));
+            }
+        }
+
         let config = SetupConfig {
             parameters,
             agent_initialization: config_raw.agent_initialization,

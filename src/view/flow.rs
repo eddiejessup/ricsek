@@ -192,7 +192,7 @@ pub fn change_view(keys: Res<Input<KeyCode>>, mut view_state: ResMut<FlowViewSta
         }
     }
     // If t/shift+t is pressed, bump the threshold up/down.
-    if keys.just_pressed(KeyCode::T) {
+    if keys.pressed(KeyCode::T) {
         view_state.threshold += 0.1
             * if keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
                 -1.0
@@ -202,7 +202,7 @@ pub fn change_view(keys: Res<Input<KeyCode>>, mut view_state: ResMut<FlowViewSta
         view_state.threshold = view_state.threshold.max(0.0);
     }
     // If l/shift+l is pressed, bump the arrow length up/down.
-    if keys.just_pressed(KeyCode::L) {
+    if keys.pressed(KeyCode::L) {
         view_state.max_arrow_length *= 1.1_f64.powi(
             if keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
                 -1

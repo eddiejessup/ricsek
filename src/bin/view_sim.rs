@@ -2,6 +2,7 @@ use std::{f32::consts::FRAC_PI_2, time::Duration};
 
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    gltf::Gltf,
     prelude::*,
     time::common_conditions::on_timer,
 };
@@ -20,10 +21,14 @@ use ricsek::{
 };
 use structopt::StructOpt;
 
+const F_COEFF: f64 = 1e6;
+const TORQUE_COEFF: f64 = 1e6;
+const V_COEFF: f64 = 1e-1;
+
 // Resources.
 
 #[derive(Resource)]
-pub struct SimViewState {
+struct SimViewState {
     pub i: usize,
     pub checkpoint_stepsize: usize,
     pub sim_stepsize: usize,
@@ -40,31 +45,35 @@ impl Default for SimViewState {
 }
 
 #[derive(Resource)]
-pub struct SimStates(pub Vec<(SimState, Option<StepSummary>)>);
+struct SimStates(pub Vec<(SimState, Option<StepSummary>)>);
 
 #[derive(Resource)]
-pub struct SetupConfigRes(pub SetupConfig);
+struct SetupConfigRes(pub SetupConfig);
+
+/// Helper resource for tracking our asset
+#[derive(Resource)]
+struct GltfAsset(Handle<Gltf>);
 
 // / Resources.
 
 // Components.
 
 #[derive(Component)]
-pub struct AgentId(pub usize);
+struct AgentId(pub usize);
 
 #[derive(Component)]
-pub enum AgentBodyComponent {
+enum AgentBodyComponent {
     Back,
     Front,
     Rod,
 }
 
 #[derive(Component)]
-pub struct FlowMarkerId(pub usize);
+struct FlowMarkerId(pub usize);
 
 // / Components.
 
-pub fn add_flow_markers(
+fn add_flow_markers(
     mut commands: Commands,
     setup_config: Res<SetupConfigRes>,
     // mut meshes: ResMut<Assets<Mesh>>,
@@ -116,21 +125,24 @@ fn update_flow_markers(
                     flow::VectorLabel("torque_boundary_electro".to_string()),
                     zero(),
                 ),
-                (flow::VectorLabel("v_fluid".to_string()), marker_fluid_v),
-                (flow::VectorLabel("v_fluid_front".to_string()), zero()),
+                (
+                    flow::VectorLabel("v_fluid".to_string()),
+                    V_COEFF * marker_fluid_v,
+                ),
             ])
         }
     }
 }
 
-pub fn add_agents(
+fn add_agents(
     mut commands: Commands,
     sim_states: Res<SimStates>,
     setup_config: Res<SetupConfigRes>,
     view_state: Res<SimViewState>,
-    mut meshes: ResMut<Assets<Mesh>>,
+    // mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+    asset_server: Res<AssetServer>,
+  ) {
     let view_i = view_state.i;
     let (cur_sim_state, _) = &sim_states.0[view_i];
 
@@ -138,27 +150,29 @@ pub fn add_agents(
 
     let radius = params.agent_radius;
 
-    let back_material = materials.add(StandardMaterial::from(Color::GREEN.with_a(0.9)));
-    let front_material = materials.add(StandardMaterial::from(Color::RED.with_a(0.9)));
+    // let back_material = materials.add(StandardMaterial::from(Color::GREEN.with_a(0.9)));
+    // let front_material = materials.add(StandardMaterial::from(Color::RED.with_a(0.9)));
     let rod_material = materials.add(StandardMaterial::from(Color::BLACK.with_a(0.9)));
 
-    let sphere_mesh = meshes.add(
-        shape::UVSphere {
-            radius: radius as f32,
-            sectors: 18,
-            stacks: 9,
-        }
-        .into(),
-    );
-    let rod_mesh = meshes.add(
-        shape::Cylinder {
-            radius: 0.1,
-            height: params.agent_inter_sphere_length as f32,
-            resolution: 18,
-            segments: 1,
-        }
-        .into(),
-    );
+    // let sphere_mesh = meshes.add(
+    //     shape::UVSphere {
+    //         radius: radius as f32,
+    //         sectors: 18,
+    //         stacks: 9,
+    //     }
+    //     .into(),
+    // );
+    // let rod_mesh = meshes.add(
+    //     shape::Cylinder {
+    //         radius: 0.1,
+    //         height: params.agent_inter_sphere_length as f32,
+    //         resolution: 18,
+    //         segments: 1,
+    //     }
+    //     .into(),
+    // );
+
+    let cell_scene_handle = asset_server.load("models/cell.glb#Scene0");
 
     cur_sim_state.agents.iter().enumerate().for_each(|(i, _a)| {
         commands
@@ -171,37 +185,13 @@ pub fn add_agents(
             ))
             .with_children(|parent| {
                 parent.spawn((
-                    PbrBundle {
-                        mesh: sphere_mesh.clone(),
-                        material: back_material.clone(),
+                    SceneBundle {
+                        scene: cell_scene_handle.clone(),
                         ..default()
                     },
                     AgentId(i),
-                    AgentBodyComponent::Back,
+                    AgentBodyComponent::Rod,
                 ));
-                parent.spawn((
-                    PbrBundle {
-                        mesh: sphere_mesh.clone(),
-                        material: front_material.clone(),
-                        ..default()
-                    },
-                    AgentId(i),
-                    AgentBodyComponent::Front,
-                ));
-                parent
-                    .spawn((
-                        SpatialBundle::default(),
-                        AgentId(i),
-                        AgentBodyComponent::Rod,
-                    ))
-                    .with_children(|rod_parent| {
-                        rod_parent.spawn((PbrBundle {
-                            mesh: rod_mesh.clone(),
-                            material: rod_material.clone(),
-                            transform: Transform::from_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
-                            ..default()
-                        },));
-                    });
             });
     });
 }
@@ -219,10 +209,6 @@ fn update_agent_points(
         let agent = &cur_sim_state.agents[agent_id.0];
         *transform = Transform::from_translation(point3_to_gvec3(&agent.seg.centroid()));
 
-        let f_coeff = 1e6;
-        let torque_coeff = 1e6;
-        let v_coeff = 1e-2;
-
         if let Some(StepSummary {
             agent_summaries,
             fluid_flow: _,
@@ -232,27 +218,27 @@ fn update_agent_points(
             *vector_set = flow::VectorSet(vec![
                 (
                     flow::VectorLabel("f_agent_electro".to_string()),
-                    f_coeff * agent_summary.f_agent_electro,
+                    F_COEFF * agent_summary.f_agent_electro,
                 ),
                 (
                     flow::VectorLabel("torque_agent_electro".to_string()),
-                    torque_coeff * agent_summary.torque_agent_electro,
+                    TORQUE_COEFF * agent_summary.torque_agent_electro,
                 ),
                 (
                     flow::VectorLabel("f_propulsion".to_string()),
-                    f_coeff * agent_summary.f_propulsion,
+                    F_COEFF * agent_summary.f_propulsion,
                 ),
                 (
                     flow::VectorLabel("f_boundary_electro".to_string()),
-                    f_coeff * agent_summary.f_boundary_electro,
+                    F_COEFF * agent_summary.f_boundary_electro,
                 ),
                 (
                     flow::VectorLabel("torque_boundary_electro".to_string()),
-                    torque_coeff * agent_summary.torque_boundary_electro,
+                    TORQUE_COEFF * agent_summary.torque_boundary_electro,
                 ),
                 (
                     flow::VectorLabel("v_fluid".to_string()),
-                    v_coeff * agent_summary.v_fluid,
+                    V_COEFF * agent_summary.v_fluid,
                 ),
             ])
         }
@@ -352,7 +338,7 @@ fn change_view(
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "ricsek_view", about = "View a run results...")]
-pub struct ViewCli {
+struct ViewCli {
     #[structopt(short = "w", long = "window-size", default_value = "800.0")]
     pub window_size: f64,
 
