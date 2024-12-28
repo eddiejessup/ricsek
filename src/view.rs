@@ -18,7 +18,7 @@ pub fn cursor_system(
     let (camera, camera_transform) = camera_q.single();
 
     let Ok(window) = window_query.get_single() else {
-      return;
+        return;
     };
 
     let camera_loc = camera_transform.translation();
@@ -32,7 +32,7 @@ pub fn cursor_system(
     // then, ask bevy to convert into world coordinates, and truncate to discard Z
     if let Some(world_position) = window
         .cursor_position()
-        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
+        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
         .map(|ray| ray.origin)
     {
         debug!(

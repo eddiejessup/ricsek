@@ -1,17 +1,4 @@
-use bevy::{
-    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
-    prelude::*,
-    time::common_conditions::on_timer,
-};
 use nalgebra::{Point3, UnitVector3, Vector3};
-use ricsek::view::{
-    common::add_axis_arrows,
-    environment::Environment,
-    flow::{self, FlowViewState},
-    pan_orbit_camera::{add_camera, pan_orbit_camera_update},
-    TIME_STEP,
-};
-use std::time::Duration;
 
 pub struct Helix {
     pub radius: f64,
@@ -77,30 +64,4 @@ fn main() {
             tang.magnitude()
         );
     }
-
-    let env = Environment {
-        boundaries: None,
-    };
-
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins((
-            LogDiagnosticsPlugin::default(),
-            FrameTimeDiagnosticsPlugin::default(),
-        ))
-        .insert_resource(env)
-        .insert_resource(FlowViewState::new())
-        .add_systems(Startup, add_camera)
-        .add_systems(Startup, add_axis_arrows)
-        // .add_systems(PostStartup, flow::add_flow)
-        .add_systems(Update, pan_orbit_camera_update)
-        .add_systems(
-            PostUpdate,
-            (
-                // flow::update_flow,
-                flow::change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
-            ),
-        )
-        .add_systems(Update, bevy::window::close_on_esc)
-        .run();
 }

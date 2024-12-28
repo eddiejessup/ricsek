@@ -33,7 +33,7 @@ pub fn initialize_run(conn: &mut PgConnection, config: &SetupConfig) -> usize {
             dsl::agent_initialization
                 .eq(serde_json::to_value(&config.agent_initialization).unwrap()),
             dsl::sampling_config.eq(serde_json::to_value(&config.sampling).unwrap()),
-            dsl::sample_points.eq(serde_json::to_value(&config.sample_points.clone()).unwrap()),
+            dsl::sample_points.eq(serde_json::to_value(config.sample_points.clone()).unwrap()),
         ))
         .returning(dsl::id)
         .get_result(conn)
@@ -50,16 +50,15 @@ pub fn write_checkpoint(
     use crate::db::schema::env::dsl;
 
     let eid = conn.transaction::<i32, Error, _>(|conn| {
+        // Debug.
         let eid: i32 = diesel::insert_into(dsl::env)
             .values((
                 None::<Eq<dsl::id, i32>>,
                 dsl::run_id.eq(rid as i32),
                 dsl::step.eq(sim_state.step as i32),
                 dsl::t.eq(sim_state.t),
-                dsl::step_summary.eq(match summary {
-                    Some(ref v) => Some(serde_json::to_value(v).unwrap()),
-                    None => None,
-                }),
+                dsl::rng.eq(serde_json::to_value(sim_state.rng.clone()).unwrap()),
+                dsl::step_summary.eq(summary.as_ref().map(|v| serde_json::to_value(v).unwrap())),
             ))
             .returning(dsl::id)
             .get_result(conn)?;
@@ -158,12 +157,13 @@ pub fn env_to_sim_state(
         step: env.step as usize,
         t: env.t,
         agents,
+        rng: serde_json::from_value(env.rng.clone()).unwrap(),
     };
 
-    let step_summary: Option<StepSummary> = match env.step_summary {
-        Some(ref v) => Some(serde_json::from_value(v.clone()).unwrap()),
-        None => None,
-    };
+    let step_summary: Option<StepSummary> = env
+        .step_summary
+        .as_ref()
+        .map(|v| serde_json::from_value(v.clone()).unwrap());
 
     (sim_state, step_summary)
 }

@@ -6,7 +6,7 @@ use std::{error::Error, fs::File, io::Read, path::Path};
 use log::info;
 use nalgebra::Point3;
 
-use crate::geometry::{arange, grid_2d, grid_3d, linspace};
+use crate::geometry::{grid_2d, grid_3d};
 
 use self::{agents::AgentInitializationConfig, parameters::simulation::SimParams};
 
@@ -50,12 +50,12 @@ impl SetupConfig {
             1.2 * parameters.boundaries.l().z,
         );
         let step = 2.0;
-        for sample_x in vec![parameters.boundaries.l_half().x] {
-        //   for sample_x in linspace(
-        //     parameters.boundaries.l_half().x - 4.0,
-        //     parameters.boundaries.l_half().x,
-        //     4,
-        // ) {
+        for sample_x in [parameters.boundaries.l_half().x] {
+            //   for sample_x in linspace(
+            //     parameters.boundaries.l_half().x - 4.0,
+            //     parameters.boundaries.l_half().x,
+            //     4,
+            // ) {
             for p in grid_2d(sample_l, step) {
                 sample_points.push(Point3::new(sample_x, p.x, p.y));
             }

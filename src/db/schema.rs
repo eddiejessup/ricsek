@@ -21,6 +21,7 @@ diesel::table! {
         run_id -> Int4,
         step -> Int4,
         t -> Float8,
+        rng -> Jsonb,
         step_summary -> Nullable<Jsonb>,
     }
 }
@@ -39,8 +40,4 @@ diesel::table! {
 diesel::joinable!(agent -> env (env_id));
 diesel::joinable!(env -> run (run_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    agent,
-    env,
-    run,
-);
+diesel::allow_tables_to_appear_in_same_query!(agent, env, run,);

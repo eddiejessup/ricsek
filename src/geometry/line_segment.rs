@@ -66,7 +66,7 @@ impl LineSegment {
         // Generate 'n' equally spaced points from p.start to p.end.
         // Compute pairwise distances.
         // Return the pair of points with the smallest distance.
-        let mut min_dist = std::f64::MAX;
+        let mut min_dist = f64::MAX;
         let mut min_pair = (self.start, p.start);
         let start_end = self.start_end();
         let p_start_end = p.start_end();
@@ -117,12 +117,10 @@ impl Closest for LineSegment {
             } else {
                 self.start
             }
+        } else if positive {
+            self.start
         } else {
-            if positive {
-                self.start
-            } else {
-                self.end
-            }
+            self.end
         }
     }
 }

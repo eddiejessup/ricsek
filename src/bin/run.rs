@@ -1,3 +1,4 @@
+use clap::Parser;
 use log::{info, warn};
 use ricsek::{
     config::{self, run::RunParams},
@@ -5,27 +6,25 @@ use ricsek::{
     state::{Agent, SimState},
 };
 
-use structopt::StructOpt;
-
-#[derive(Debug, StructOpt)]
-#[structopt(name = "ricsek_run", about = "Run an initialized simulation...")]
+#[derive(Debug, clap::Parser)]
+#[command(name = "ricsek_run", about = "Run an initialized simulation...")]
 pub struct RunCli {
-    #[structopt(short = "d", long = "dt-view")]
+    #[arg(short = 'd', long = "dt-view")]
     pub dt_view: f64,
 
-    #[structopt(short = "t")]
+    #[arg(short = 't')]
     pub t_max: f64,
 
-    #[structopt(short = "r", long = "run")]
+    #[arg(short = 'r', long = "run")]
     pub run_id: Option<usize>,
 
-    #[structopt(long = "resume")]
+    #[arg(long = "resume")]
     pub resume: bool,
 }
 
 fn main() {
     env_logger::init();
-    let args = RunCli::from_args();
+    let args = RunCli::parse();
 
     let conn = &mut ricsek::db::establish_connection();
 

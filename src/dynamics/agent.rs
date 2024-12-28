@@ -1,11 +1,9 @@
 use nalgebra::{Point3, UnitVector3, Vector3};
+use num_traits::Zero;
 
 use crate::geometry::{capsule::capsule_bounding_box, line_segment::LineSegment};
 
-use super::{
-    common::{zero_wrench, Wrench},
-    electro::electro_kinematics,
-};
+use super::{common::Wrench, electro::electro_kinematics};
 
 pub fn capsule_electro_torque(
     f: Vector3<f64>,
@@ -29,11 +27,11 @@ pub fn capsule_capsule_electro(
     electro_coeff: f64,
 ) -> Wrench {
     let might_overlap =
-        capsule_bounding_box(&seg1, radius).overlaps(capsule_bounding_box(&seg2, radius));
+        capsule_bounding_box(seg1, radius).overlaps(capsule_bounding_box(seg2, radius));
     if !might_overlap {
-        return zero_wrench();
+        return Wrench::zero();
     }
-    let (seg1p, seg2p) = seg1.approx_closest_points_on_segment(&seg2, 5);
+    let (seg1p, seg2p) = seg1.approx_closest_points_on_segment(seg2, 5);
     let r1c_r2c = seg2p - seg1p;
 
     let force = electro_kinematics(
@@ -69,7 +67,7 @@ pub fn capsule_capsules_electro(
 ) -> Wrench {
     segs.iter()
         .enumerate()
-        .fold(zero_wrench(), |w_tot, (i2, seg2)| {
+        .fold(Wrench::zero(), |w_tot, (i2, seg2)| {
             if i1 == i2 {
                 w_tot
             } else {
@@ -87,7 +85,7 @@ pub fn capsules_capsules_electro(
     segs.iter()
         .enumerate()
         .map(|(i_capsule, capsule)| {
-            capsule_capsules_electro(capsule, i_capsule, &segs, radius, electro_coeff)
+            capsule_capsules_electro(capsule, i_capsule, segs, radius, electro_coeff)
         })
         .collect()
 }

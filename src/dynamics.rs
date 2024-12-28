@@ -11,13 +11,15 @@ use crate::config::run::{RunContext, RunParams};
 use crate::config::setup::parameters::common::BoundaryConfig;
 use crate::config::setup::parameters::simulation::SimParams;
 use crate::config::setup::parameters::singularities::SingularityParams;
-use crate::dynamics::common::zero_wrench;
 use crate::geometry::line_segment::LineSegment;
 use crate::geometry::point::{random_vector, ObjectPoint};
+use crate::numerics::interface::{ElectroContextTrait, FluidContextTrait};
 use crate::state::*;
+use common::Wrench;
 use diesel::result::Error;
 use log::{debug, info};
 use nalgebra::{zero, Point3, Rotation3, UnitVector3, Vector3};
+use num_traits::Zero;
 use rand_distr::Uniform;
 
 use self::brownian::brownian_distr;
@@ -114,42 +116,43 @@ pub fn get_singularity_image_across_plane(
 }
 
 pub fn get_singularity_image(
-    p: &ObjectPoint,
-    params: &SingularityParams,
+    _p: &ObjectPoint,
+    _params: &SingularityParams,
     boundaries: &BoundaryConfig,
 ) -> Vec<(ObjectPoint, SingularityParams)> {
     let param_sets_per_axis: Vec<Vec<(ObjectPoint, SingularityParams)>> = boundaries
         .0
         .iter()
         .enumerate()
-        .filter_map(|(i_axis, axis)| {
+        .filter_map(|(_i_axis, axis)| {
             if axis.closed {
+                panic!("Closed boundaries not currently supported");
                 // Find the vector pointing to the nearest boundary along this axis.
-                let d = Vector3::ith(
-                    i_axis,
-                    if p.position_com[i_axis] > 0.0 {
-                        1.0
-                    } else {
-                        -1.0
-                    } * (axis.l_half() - p.position[i_axis]),
-                );
-                Some(
-                    get_singularity_image_across_plane(d, params)
-                        .iter()
-                        .map(|params| {
-                            (
-                                // Place each singularity on the opposite side of the boundary.
-                                ObjectPoint {
-                                    // ID to indicate fictional singularities.
-                                    object_id: std::u32::MAX - 1,
-                                    position_com: p.position_com + 2.0 * d,
-                                    position: p.position + 2.0 * d,
-                                },
-                                params.clone(),
-                            )
-                        })
-                        .collect(),
-                )
+                // let d = Vector3::ith(
+                //     i_axis,
+                //     if p.position_com[i_axis] > 0.0 {
+                //         1.0
+                //     } else {
+                //         -1.0
+                //     } * (axis.l_half() - p.position[i_axis]),
+                // );
+                // Some(
+                //     get_singularity_image_across_plane(d, params)
+                //         .iter()
+                //         .map(|params| {
+                //             (
+                //                 // Place each singularity on the opposite side of the boundary.
+                //                 ObjectPoint {
+                //                     // ID to indicate fictional singularities.
+                //                     object_id: std::u32::MAX - 1,
+                //                     position_com: p.position_com + 2.0 * d,
+                //                     position: p.position + 2.0 * d,
+                //                 },
+                //                 params.clone(),
+                //             )
+                //         })
+                //         .collect(),
+                // )
             } else {
                 None
             }
@@ -158,7 +161,7 @@ pub fn get_singularity_image(
     if param_sets_per_axis.len() > 1 {
         panic!("More than one boundary is closed");
     }
-    param_sets_per_axis.iter().cloned().flatten().collect()
+    param_sets_per_axis.iter().flatten().cloned().collect()
 }
 
 pub fn agent_singularities(
@@ -224,7 +227,7 @@ pub fn agent_singularities(
     // Return the concatenation of base and image.
     base_singularities
         .into_iter()
-        .chain(image_singularities.into_iter())
+        .chain(image_singularities)
         .collect()
 }
 
@@ -261,7 +264,6 @@ pub fn update(
     sim_params: &SimParams,
     sim_state: &mut SimState,
     run_context: &RunContext,
-    rng: &mut rand::rngs::ThreadRng,
 ) -> StepSummary {
     let uniform_theta_dist = Uniform::new(0.0, 2.0 * PI);
     let uniform_cos_phi_dist = Uniform::new(-1.0, 1.0);
@@ -276,7 +278,7 @@ pub fn update(
 
     // Agent-agent electrostatic repulsion.
     let agent_agent_electro_wrenches: Vec<_> = if sim_params.enable_agent_agent_electro {
-        run_context.gpu_electro_context.evaluate(
+        run_context.electro_context.evaluate(
             &sim_state
                 .agents
                 .iter()
@@ -284,7 +286,7 @@ pub fn update(
                 .collect::<Vec<LineSegment>>(),
         )
     } else {
-        vec![zero_wrench(); sim_state.agents.len()]
+        vec![Wrench::zero(); sim_state.agents.len()]
     };
 
     let (fluid_twists_at_agents, fluid_flow): (Vec<_>, Vec<_>) = if sim_params.enable_fluid {
@@ -302,11 +304,11 @@ pub fn update(
             })
             .collect();
         let fluid_twists_at_agents = run_context
-            .gpu_fluid_agent_context
+            .fluid_agent_context
             .evaluate(&agent_eval_points, &agent_singularities);
 
         let fluid_flow = run_context
-            .gpu_fluid_sample_context
+            .fluid_sample_context
             .evaluate(&run_context.sample_eval_points, &agent_singularities)
             .iter()
             .map(|twist| twist.0)
@@ -320,7 +322,7 @@ pub fn update(
     };
 
     let mut agent_summaries: Vec<AgentStepSummary> = vec![];
-    for (i_agent, mut agent) in sim_state.agents.iter_mut().enumerate() {
+    for (i_agent, agent) in sim_state.agents.iter_mut().enumerate() {
         // Fluid velocity and rotation.
 
         // Agent propulsion.
@@ -344,7 +346,7 @@ pub fn update(
                 sim_params.agent_object_hertz_force_coefficient,
             )
         } else {
-            zero_wrench()
+            Wrench::zero()
         };
 
         debug!("Doing force balance calculation for linear velocity");
@@ -354,7 +356,8 @@ pub fn update(
             fluid_twist.0,
             f_propulsion + agent_agent_electro_wrench.force + agent_boundary_electro_wrench.force,
         );
-        let dr_object = v_object * sim_params.dt + random_vector(rng, trans_diff_dist);
+        let dr_object =
+            v_object * sim_params.dt + random_vector(&mut sim_state.rng, trans_diff_dist);
         // Compute translational diffusion translation.
         agent.seg.translate(dr_object);
 
@@ -373,7 +376,7 @@ pub fn update(
 
         // Compute rotational diffusion rotation.
         let rot_rotational_diffusion = brownian::random_rotation(
-            rng,
+            &mut sim_state.rng,
             &uniform_theta_dist,
             &uniform_cos_phi_dist,
             &rot_diff_dist,
@@ -382,7 +385,7 @@ pub fn update(
         agent.seg.rotate(rot_rotational_diffusion * rot_object);
 
         // Apply periodic boundary condition.
-        boundary::wrap_agent_inplace(&mut agent, &sim_params.boundaries);
+        boundary::wrap_agent_inplace(agent, &sim_params.boundaries);
 
         agent_summaries.push(AgentStepSummary {
             f_agent_electro: agent_agent_electro_wrench.force,
@@ -408,12 +411,11 @@ pub fn run_steps(
     sim_params: &SimParams,
     sim_state: &mut SimState,
     run_context: &RunContext,
-    rng: &mut rand::rngs::ThreadRng,
     num_steps: usize,
 ) -> Option<StepSummary> {
     let mut summary = None;
     for _ in 0..num_steps {
-        summary = Some(update(&sim_params, sim_state, &run_context, rng));
+        summary = Some(update(sim_params, sim_state, run_context));
     }
     summary
 }
@@ -425,11 +427,10 @@ pub fn run(
     mut sim_state: SimState,
     run_params: RunParams,
 ) -> Result<(), Error> {
-    let rng = &mut rand::thread_rng();
     let run_context = RunContext::new(&sim_params, sim_state.agents.len(), sample_points);
 
     while sim_state.t < run_params.t_max {
-        let summary = update(&sim_params, &mut sim_state, &run_context, rng);
+        let summary = update(&sim_params, &mut sim_state, &run_context);
 
         if sim_state.step % run_params.dstep_view == 0 {
             // Print time with resolution of 0.1ms.

@@ -2,6 +2,7 @@ use nalgebra::{Point2, Point3, UnitVector3, Vector2, Vector3};
 
 pub mod capsule;
 pub mod closest;
+pub mod cone;
 pub mod line_segment;
 pub mod point;
 pub mod sphere;

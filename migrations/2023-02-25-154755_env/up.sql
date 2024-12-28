@@ -3,6 +3,7 @@ CREATE TABLE env (
     run_id INTEGER NOT NULL REFERENCES run(id),
     step INTEGER NOT NULL,
     t FLOAT NOT NULL,
+    rng JSONB NOT NULL,
     step_summary JSONB,
     UNIQUE (run_id, step)
 );

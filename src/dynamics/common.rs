@@ -1,4 +1,5 @@
 use nalgebra::Vector3;
+use num_traits::Zero;
 
 #[derive(Debug, Clone)]
 pub struct Wrench {
@@ -6,10 +7,16 @@ pub struct Wrench {
     pub torque: Vector3<f64>,
 }
 
-pub fn zero_wrench() -> Wrench {
-    Wrench {
-        force: Vector3::zeros(),
-        torque: Vector3::zeros(),
+impl Zero for Wrench {
+    fn zero() -> Self {
+        Self {
+            force: Vector3::zeros(),
+            torque: Vector3::zeros(),
+        }
+    }
+
+    fn is_zero(&self) -> bool {
+        self.force.is_zero() && self.torque.is_zero()
     }
 }
 

@@ -13,7 +13,7 @@ use ricsek::{
 };
 use tobj::{self, LoadOptions};
 
-use bevy::prelude::*;
+use bevy::{color::palettes::css, prelude::*};
 use bevy_obj::ObjPlugin;
 
 #[derive(Debug, Clone)]
@@ -144,16 +144,17 @@ fn add_mesh(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    let mesh_material = materials.add(StandardMaterial::from(Color::RED.with_a(0.4)));
-    let normal_material = materials.add(StandardMaterial::from(Color::BLUE));
-    let value_material = materials.add(StandardMaterial::from(Color::GREEN));
+    let mesh_material = materials.add(StandardMaterial::from(Color::from(
+        css::RED.with_alpha(0.4),
+    )));
+    let normal_material = materials.add(StandardMaterial::from(Color::from(css::BLUE)));
+    let value_material = materials.add(StandardMaterial::from(Color::from(css::GREEN)));
     let mesh_handle = asset_server.load(MESH_PATH);
-    commands.spawn((PbrBundle {
-        mesh: mesh_handle,
-        material: mesh_material,
-        transform: Transform::IDENTITY.with_scale(Vec3::splat(1.0)),
-        ..default()
-    },));
+    commands.spawn((
+        Mesh3d::from(mesh_handle),
+        MeshMaterial3d(mesh_material),
+        Transform::IDENTITY.with_scale(Vec3::splat(1.0)),
+    ));
 
     let f = 1.0;
     let g = 0.1;
@@ -164,48 +165,35 @@ fn add_mesh(
         .triangles
         .iter()
         .map(|(_f, v)| v.norm())
-        .fold(std::f64::NEG_INFINITY, |acc, v_mag| acc.max(v_mag));
+        .fold(f64::NEG_INFINITY, |acc, v_mag| acc.max(v_mag));
 
     for (face, value) in faces.triangles.iter() {
         let centroid = face.centroid();
         let normal = face.normal();
 
         // Normal.
-        match vec3_to_gvec3(&normal.into_inner()).try_normalize() {
-            Some(glam_u) => {
-                // Normal.
-                commands
-                    .spawn(SpatialBundle {
-                        transform: Transform::from_translation(point3_to_gvec3(&centroid))
-                            .with_scale(Vec3::splat((arrow_length * g) as f32))
-                            .looking_to(glam_u, Vec3::Z),
-                        ..default()
-                    })
-                    .with_children(|parent| {
-                        spawn_arrow(parent, &mut meshes, normal_material.clone());
-                    });
-            }
-            None => {}
+        if let Some(glam_u) = vec3_to_gvec3(&normal.into_inner()).try_normalize() {
+            commands
+                .spawn((Transform::from_translation(point3_to_gvec3(&centroid))
+                    .with_scale(Vec3::splat((arrow_length * g) as f32))
+                    .looking_to(glam_u, Vec3::Z),))
+                .with_children(|parent| {
+                    spawn_arrow(parent, &mut meshes, normal_material.clone());
+                });
         };
 
         // Vector value.
-        match vec3_to_gvec3(&value).try_normalize() {
-            Some(glam_u) => {
-                // Normal.
-                let v_mag = value.norm() / v_mag_max;
-                commands
-                    .spawn(SpatialBundle {
-                        transform: Transform::from_translation(point3_to_gvec3(&centroid))
-                            .with_scale(Vec3::splat((arrow_length * f * v_mag) as f32))
-                            .looking_to(glam_u, Vec3::Z),
-                        ..default()
-                    })
-                    .with_children(|parent| {
-                        spawn_arrow(parent, &mut meshes, value_material.clone());
-                    });
-            }
-            None => {}
-        };
+        if let Some(glam_u) = vec3_to_gvec3(value).try_normalize() {
+            // Normal.
+            let v_mag = value.norm() / v_mag_max;
+            commands
+                .spawn((Transform::from_translation(point3_to_gvec3(&centroid))
+                    .with_scale(Vec3::splat((arrow_length * f * v_mag) as f32))
+                    .looking_to(glam_u, Vec3::Z),))
+                .with_children(|parent| {
+                    spawn_arrow(parent, &mut meshes, value_material.clone());
+                });
+        }
     }
 }
 
@@ -407,6 +395,6 @@ fn main() {
         .add_systems(Startup, add_axis_arrows)
         .add_systems(Startup, add_mesh)
         .add_systems(Update, pan_orbit_camera_update)
-        .add_systems(Update, bevy::window::close_on_esc)
+        .add_systems(Update, common::close_on_esc)
         .run();
 }

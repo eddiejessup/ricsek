@@ -1,5 +1,5 @@
 use crate::config::setup::parameters::common::BoundaryConfig;
-use bevy::prelude::*;
+use bevy::{color::palettes::css, prelude::*};
 
 #[derive(Resource)]
 pub struct Environment {
@@ -59,17 +59,16 @@ pub fn add_boundaries(
 
     for (size, axis, axis_l, closed, up) in axis_configs {
         for sgn in [1, -1] {
-            commands.spawn((PbrBundle {
-                mesh: meshes.add(shape::Quad { size, flip: false }.into()),
-                material: materials.add(StandardMaterial::from(if closed {
-                    Color::WHITE
+            commands.spawn((
+                Mesh3d(meshes.add(Rectangle::from_size(size).mesh().build())),
+                MeshMaterial3d(materials.add(StandardMaterial::from(Color::from(if closed {
+                    css::WHITE
                 } else {
-                    Color::YELLOW
-                })),
-                transform: Transform::from_translation(axis * (sgn as f32) * axis_l as f32 / 2.0)
+                    css::YELLOW
+                })))),
+                Transform::from_translation(axis * (sgn as f32) * axis_l as f32 / 2.0)
                     .looking_to(axis * sgn as f32, up),
-                ..default()
-            },));
+            ));
         }
     }
 }

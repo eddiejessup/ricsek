@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bevy::{prelude::*, time::common_conditions::on_timer};
+use bevy::{color::palettes::css, prelude::*, time::common_conditions::on_timer};
 use nalgebra::{zero, Point3, Vector3};
 use ricsek::{
     config::setup::parameters::{
@@ -39,12 +39,9 @@ pub fn add_flow_markers(
 
     for sample in markers.0.iter() {
         commands.spawn((
-            PbrBundle {
-                // mesh: cube.clone(),
-                // material: red.clone(),
-                transform: Transform::from_translation(point3_to_gvec3(&sample.r)),
-                ..default()
-            },
+            // Mesh3d(cube.clone()),
+            // MeshMaterial3d(red.clone()),
+            Transform::from_translation(point3_to_gvec3(&sample.r)),
             sample.vs.clone(),
         ));
     }
@@ -58,17 +55,14 @@ pub fn add_singularities(
 ) {
     // Marker bases.
     let material_handle: Handle<StandardMaterial> =
-        materials.add(StandardMaterial::from(Color::YELLOW));
-    let mesh_handle: Handle<Mesh> = meshes.add((shape::Cube { size: 1.0 }).into()).into();
+        materials.add(StandardMaterial::from(Color::from(css::YELLOW)));
+    let mesh_handle: Handle<Mesh> = meshes.add(Cuboid::from_length(1.0).mesh());
 
     for (label, sing) in singularities.0.iter() {
         commands.spawn((
-            PbrBundle {
-                mesh: mesh_handle.clone(),
-                material: material_handle.clone(),
-                transform: Transform::from_translation(point3_to_gvec3(&sing.point)),
-                ..default()
-            },
+            Mesh3d(mesh_handle.clone()),
+            MeshMaterial3d(material_handle.clone()),
+            Transform::from_translation(point3_to_gvec3(&sing.point)),
             label.clone(),
         ));
     }
@@ -213,10 +207,10 @@ fn main() {
                 singularities
                     .iter()
                     .map(|(label, s)| {
-                      let v = s.eval(*r).0;
-                      println!("{}: {}", label.0, v);
-                      (label.clone(), v)
-        })
+                        let v = s.eval(*r).0;
+                        println!("{}: {}", label.0, v);
+                        (label.clone(), v)
+                    })
                     .collect(),
             ),
         })
@@ -227,7 +221,7 @@ fn main() {
         .insert_resource(env)
         .insert_resource(MarkerSet(markers))
         .insert_resource(SingularitySet(singularities))
-        .insert_resource(FlowViewState::new())
+        .insert_resource(FlowViewState::default())
         .add_systems(
             Startup,
             (
@@ -243,9 +237,9 @@ fn main() {
         .add_systems(
             Update,
             (
-                flow::change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
+                flow::update_flow_markers.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
                 update_flow,
-                bevy::window::close_on_esc,
+                common::close_on_esc,
             ),
         )
         .run();

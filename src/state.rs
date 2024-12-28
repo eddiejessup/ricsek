@@ -1,13 +1,15 @@
+use crate::geometry::line_segment::LineSegment;
 use log::debug;
 use nalgebra::{Point3, UnitVector3, Vector3};
-
-use crate::geometry::line_segment::LineSegment;
+use rand::prelude::*;
+use rand_pcg::Pcg64Mcg;
 
 #[derive(Clone)]
 pub struct SimState {
     pub agents: Vec<Agent>,
     pub t: f64,
     pub step: usize,
+    pub rng: Pcg64Mcg,
 }
 
 impl SimState {
@@ -16,6 +18,7 @@ impl SimState {
             agents,
             t: 0.0,
             step: 0,
+            rng: Pcg64Mcg::from_entropy(),
         }
     }
 }

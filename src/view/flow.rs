@@ -1,4 +1,4 @@
-use bevy::{prelude::*, render::view::visibility::Visibility};
+use bevy::{color::palettes::css, prelude::*, render::view::visibility::Visibility};
 use nalgebra::Vector3;
 
 use crate::view::common::vec3_to_gvec3;
@@ -21,8 +21,8 @@ pub struct FlowViewState {
     pub threshold: f64,
 }
 
-impl FlowViewState {
-    pub fn new() -> Self {
+impl Default for FlowViewState {
+    fn default() -> Self {
         Self {
             vector_statuses: [false; 9],
             threshold: 0.0,
@@ -39,24 +39,33 @@ pub fn add_flow(
     mut materials: ResMut<Assets<StandardMaterial>>,
     q_vsets: Query<Entity, With<VectorSet>>,
 ) {
-    commands.spawn(TextBundle::from_section(
-        "",
-        TextStyle {
+    commands.spawn((
+        Text::new("Initial flow vectors"),
+        TextFont {
             font: asset_server.load("fonts/Inconsolata-Regular.ttf"),
             font_size: 40.0,
-            color: Color::PURPLE,
+            ..default()
         },
+        // TextLayout::new_with_justify(JustifyText::Center),
+        // Node {
+        //   position_type: PositionType::Absolute,
+        //   bottom: Val::Px(5.0),
+        //   right: Val::Px(5.0),
+        //   ..default()
+        // },
+        TextColor(Color::from(css::PURPLE)),
     ));
 
-    // let mut n_vsets = 0;
+    let mut n_vsets = 0;
     for vset_entity in q_vsets.iter() {
         // Create a new material here, because we will in fact change the color
         // of the flow vector.
-        let child_material: Handle<StandardMaterial> =
-            materials.add(StandardMaterial::from(Color::PURPLE.with_a(0.9)));
+        let child_material: Handle<StandardMaterial> = materials.add(StandardMaterial::from(
+            Color::from(css::PURPLE).with_alpha(0.9),
+        ));
 
         let flow_vector_parent = commands
-            .spawn((FlowVector, SpatialBundle { ..default() }))
+            .spawn((FlowVector, Transform::default(), Visibility::default()))
             .with_children(|parent| {
                 spawn_arrow(parent, &mut meshes, child_material);
             })
@@ -64,9 +73,9 @@ pub fn add_flow(
 
         commands.entity(vset_entity).add_child(flow_vector_parent);
 
-        // n_vsets += 1;
+        n_vsets += 1;
     }
-    // info!("Added {} flow vector sets.", n_vsets);
+    info!("Added {} flow vector sets.", n_vsets);
 }
 
 pub fn update_flow(
@@ -103,9 +112,9 @@ pub fn update_flow(
         .collect();
 
     let mut text = q_text.get_single_mut().unwrap();
-    text.sections[0].value = format!(
+    text.0 = format!(
         "Flow vector: {}",
-        match net_vs_and_labels.get(0) {
+        match net_vs_and_labels.first() {
             Some((labels, _)) => labels
                 .iter()
                 .map(|s| s.clone().0)
@@ -118,7 +127,7 @@ pub fn update_flow(
     let v_max_scale = 1.0;
 
     // Iterate over markers.
-    // let mut n_markers = 0;
+    let mut n_markers = 0;
     for (i, (_vs, vset_children)) in q_vectorset.iter().enumerate() {
         // Get the selected flow vector.
         let v = net_vs_and_labels[i].1;
@@ -154,7 +163,7 @@ pub fn update_flow(
             match vec3_to_gvec3(&v).try_normalize() {
                 Some(glam_u) => {
                     if arrow_length > 1e-2 {
-                        // info!("Setting arrow length to {}", arrow_length);
+                        // debug!("Setting arrow length to {}", arrow_length);
                         *transform = Transform::from_scale(Vec3::splat(arrow_length as f32))
                             .looking_to(glam_u, Vec3::Z)
                     } else {
@@ -169,22 +178,22 @@ pub fn update_flow(
             };
         }
 
-        // n_markers += 1;
+        n_markers += 1;
     }
-    // info!("Updated {} flow vectors.", n_markers);
+    info!("Updated {} flow vectors.", n_markers);
 }
 
-pub fn change_view(keys: Res<Input<KeyCode>>, mut view_state: ResMut<FlowViewState>) {
+pub fn update_flow_markers(keys: Res<ButtonInput<KeyCode>>, mut view_state: ResMut<FlowViewState>) {
     let entries = [
-        (KeyCode::Key1, 0),
-        (KeyCode::Key2, 1),
-        (KeyCode::Key3, 2),
-        (KeyCode::Key4, 3),
-        (KeyCode::Key5, 4),
-        (KeyCode::Key6, 5),
-        (KeyCode::Key7, 6),
-        (KeyCode::Key8, 7),
-        (KeyCode::Key9, 8),
+        (KeyCode::Digit1, 0),
+        (KeyCode::Digit2, 1),
+        (KeyCode::Digit3, 2),
+        (KeyCode::Digit4, 3),
+        (KeyCode::Digit5, 4),
+        (KeyCode::Digit6, 5),
+        (KeyCode::Digit7, 6),
+        (KeyCode::Digit8, 7),
+        (KeyCode::Digit9, 8),
     ];
     for (keycode, ix) in entries {
         if keys.just_pressed(keycode) {
@@ -192,7 +201,7 @@ pub fn change_view(keys: Res<Input<KeyCode>>, mut view_state: ResMut<FlowViewSta
         }
     }
     // If t/shift+t is pressed, bump the threshold up/down.
-    if keys.pressed(KeyCode::T) {
+    if keys.pressed(KeyCode::KeyT) {
         view_state.threshold += 0.1
             * if keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
                 -1.0
@@ -202,7 +211,7 @@ pub fn change_view(keys: Res<Input<KeyCode>>, mut view_state: ResMut<FlowViewSta
         view_state.threshold = view_state.threshold.max(0.0);
     }
     // If l/shift+l is pressed, bump the arrow length up/down.
-    if keys.pressed(KeyCode::L) {
+    if keys.pressed(KeyCode::KeyL) {
         view_state.max_arrow_length *= 1.1_f64.powi(
             if keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
                 -1

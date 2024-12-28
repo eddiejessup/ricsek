@@ -49,7 +49,12 @@ pub fn random_uniform_positions(
         .collect()
 }
 
-fn random_uniform_agents(rng: &mut ThreadRng, n: usize, l: Vector3<f64>, d: f64) -> Vec<state::Agent> {
+fn random_uniform_agents(
+    rng: &mut ThreadRng,
+    n: usize,
+    l: Vector3<f64>,
+    d: f64,
+) -> Vec<state::Agent> {
     let rs = random_uniform_positions(rng, n, l.add_scalar(-2.0 * d));
     let us = random_uniform_orientations(rng, n);
     (0..n).map(|i| Agent::new(rs[i], us[i].scale(d))).collect()
@@ -73,8 +78,9 @@ pub fn initialize_agents(
         AgentInitializationConfig::RandomUniformByNumber(AgentNumberConfig { number }) => {
             random_uniform_agents(rng, number, l, d)
         }
-        AgentInitializationConfig::Explicit(ExplicitAgentsConfig { agents }) => agents.iter().map(
-            |ExplicitAgentConfig { r, u }| Agent::new(*r, u.scale(d)),
-        ).collect(),
+        AgentInitializationConfig::Explicit(ExplicitAgentsConfig { agents }) => agents
+            .iter()
+            .map(|ExplicitAgentConfig { r, u }| Agent::new(*r, u.scale(d)))
+            .collect(),
     }
 }

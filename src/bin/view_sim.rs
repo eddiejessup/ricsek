@@ -1,12 +1,14 @@
-use std::{f32::consts::FRAC_PI_2, time::Duration};
+use std::time::Duration;
 
 use bevy::{
+    color::palettes::css,
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
-    gltf::Gltf,
     prelude::*,
+    render::mesh::SphereKind,
     time::common_conditions::on_timer,
 };
-use nalgebra::{zero, Point3};
+use clap::Parser;
+use nalgebra::zero;
 use ricsek::{
     config::{run::RunContext, setup::SetupConfig},
     dynamics::{run_steps, StepSummary},
@@ -19,7 +21,6 @@ use ricsek::{
         *,
     },
 };
-use structopt::StructOpt;
 
 const F_COEFF: f64 = 1e6;
 const TORQUE_COEFF: f64 = 1e6;
@@ -51,8 +52,8 @@ struct SimStates(pub Vec<(SimState, Option<StepSummary>)>);
 struct SetupConfigRes(pub SetupConfig);
 
 /// Helper resource for tracking our asset
-#[derive(Resource)]
-struct GltfAsset(Handle<Gltf>);
+// #[derive(Resource)]
+// struct GltfAsset(Handle<Gltf>);
 
 // / Resources.
 
@@ -63,8 +64,8 @@ struct AgentId(pub usize);
 
 #[derive(Component)]
 enum AgentBodyComponent {
-    Back,
-    Front,
+    // Back,
+    // Front,
     Rod,
 }
 
@@ -76,21 +77,19 @@ struct FlowMarkerId(pub usize);
 fn add_flow_markers(
     mut commands: Commands,
     setup_config: Res<SetupConfigRes>,
-    // mut meshes: ResMut<Assets<Mesh>>,
-    // mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Marker bases.
-    // let red: Handle<StandardMaterial> = materials.add(StandardMaterial::from(Color::RED));
-    // let cube: Handle<Mesh> = meshes.add((shape::Cube { size: 1.0 }).into()).into();
+    let red: Handle<StandardMaterial> =
+        materials.add(StandardMaterial::from(Color::from(css::RED)));
+    let cube: Handle<Mesh> = meshes.add(Cuboid::from_length(0.2).mesh().build());
 
     for (i, sample) in setup_config.0.sample_points.iter().enumerate() {
         commands.spawn((
-            PbrBundle {
-                // mesh: cube.clone(),
-                // material: red.clone(),
-                transform: Transform::from_translation(point3_to_gvec3(&sample)),
-                ..default()
-            },
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(red.clone()),
+            Transform::from_translation(point3_to_gvec3(sample)),
             FlowMarkerId(i),
             flow::VectorSet(vec![]),
         ));
@@ -139,10 +138,10 @@ fn add_agents(
     sim_states: Res<SimStates>,
     setup_config: Res<SetupConfigRes>,
     view_state: Res<SimViewState>,
-    // mut meshes: ResMut<Assets<Mesh>>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    asset_server: Res<AssetServer>,
-  ) {
+    _asset_server: Res<AssetServer>,
+) {
     let view_i = view_state.i;
     let (cur_sim_state, _) = &sim_states.0[view_i];
 
@@ -150,45 +149,48 @@ fn add_agents(
 
     let radius = params.agent_radius;
 
-    // let back_material = materials.add(StandardMaterial::from(Color::GREEN.with_a(0.9)));
-    // let front_material = materials.add(StandardMaterial::from(Color::RED.with_a(0.9)));
-    let rod_material = materials.add(StandardMaterial::from(Color::BLACK.with_a(0.9)));
+    let _back_material = materials.add(StandardMaterial::from(
+        Color::from(css::GREEN).with_alpha(0.9),
+    ));
+    let _front_material = materials.add(StandardMaterial::from(
+        Color::from(css::RED).with_alpha(0.9),
+    ));
+    let rod_material = materials.add(StandardMaterial::from(Color::BLACK.with_alpha(0.9)));
 
-    // let sphere_mesh = meshes.add(
-    //     shape::UVSphere {
-    //         radius: radius as f32,
-    //         sectors: 18,
-    //         stacks: 9,
-    //     }
-    //     .into(),
-    // );
-    // let rod_mesh = meshes.add(
-    //     shape::Cylinder {
-    //         radius: 0.1,
-    //         height: params.agent_inter_sphere_length as f32,
-    //         resolution: 18,
-    //         segments: 1,
-    //     }
-    //     .into(),
-    // );
+    let _sphere_mesh = meshes.add(
+        Sphere::new(radius as f32)
+            .mesh()
+            .kind(SphereKind::Uv {
+                sectors: 18,
+                stacks: 9,
+            })
+            .build(),
+    );
+    let rod_mesh = meshes.add(
+        Cylinder::new(0.1, params.agent_inter_sphere_length as f32)
+            .mesh()
+            .segments(6)
+            .resolution(18)
+            .build(),
+    );
 
-    let cell_scene_handle = asset_server.load("models/cell.glb#Scene0");
+    // let cell_scene_handle = asset_server.load("models/cell.glb#Scene0");
 
     cur_sim_state.agents.iter().enumerate().for_each(|(i, _a)| {
         commands
             // Represents the point, don't adjust its orientation,
             // just translate it to the agent's centre-of-mass position.
             .spawn((
-                SpatialBundle::default(),
+                Transform::default(),
+                Visibility::default(),
                 AgentId(i),
                 flow::VectorSet(vec![]),
             ))
             .with_children(|parent| {
                 parent.spawn((
-                    SceneBundle {
-                        scene: cell_scene_handle.clone(),
-                        ..default()
-                    },
+                    // Add cylinder
+                    Mesh3d::from(rod_mesh.clone()),
+                    MeshMaterial3d(rod_material.clone()),
                     AgentId(i),
                     AgentBodyComponent::Rod,
                 ));
@@ -256,14 +258,14 @@ fn update_agent_orientations(
     for (agent_id, mut transform, agent_body) in &mut q_ag {
         let agent = &cur_sim_state.agents[agent_id.0];
         *transform = match agent_body {
-            AgentBodyComponent::Front => Transform::from_translation(point3_to_gvec3(
-                &(Point3::origin() + agent.seg.start_end() * 0.5),
-            ))
-            .looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z),
-            AgentBodyComponent::Back => Transform::from_translation(point3_to_gvec3(
-                &(Point3::origin() - agent.seg.start_end() * 0.5),
-            ))
-            .looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z),
+            // AgentBodyComponent::Front => Transform::from_translation(point3_to_gvec3(
+            //     &(Point3::origin() + agent.seg.start_end() * 0.5),
+            // ))
+            // .looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z),
+            // AgentBodyComponent::Back => Transform::from_translation(point3_to_gvec3(
+            //     &(Point3::origin() - agent.seg.start_end() * 0.5),
+            // ))
+            // .looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z),
             AgentBodyComponent::Rod => {
                 Transform::IDENTITY.looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z)
             }
@@ -271,20 +273,20 @@ fn update_agent_orientations(
     }
 }
 
-fn change_view(
-    keyboard_input: Res<Input<KeyCode>>,
+fn update_timestep(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     setup_config: Res<SetupConfigRes>,
     mut sim_states: ResMut<SimStates>,
     mut view_state: ResMut<SimViewState>,
 ) {
-    if keyboard_input.just_pressed(KeyCode::Key0) {
+    if keyboard_input.just_pressed(KeyCode::Digit0) {
         view_state.i = 0;
         return;
     }
 
-    let backward = if keyboard_input.pressed(KeyCode::Left) {
+    let backward = if keyboard_input.pressed(KeyCode::ArrowLeft) {
         Some(true)
-    } else if keyboard_input.pressed(KeyCode::Right) {
+    } else if keyboard_input.pressed(KeyCode::ArrowRight) {
         Some(false)
     } else {
         None
@@ -292,20 +294,18 @@ fn change_view(
 
     if let Some(backward) = backward {
         if !backward && view_state.i == sim_states.0.len() - 1 {
-            let mut final_state = (&sim_states.0[view_state.i]).0.clone();
+            let mut final_state = (sim_states.0[view_state.i]).0.clone();
 
             let run_context = RunContext::new(
                 &setup_config.0.parameters,
                 final_state.agents.len(),
                 setup_config.0.sample_points.clone(),
             );
-            let rng = &mut rand::thread_rng();
 
             let summary = run_steps(
                 &setup_config.0.parameters,
                 &mut final_state,
                 &run_context,
-                rng,
                 view_state.sim_stepsize,
             );
 
@@ -322,9 +322,9 @@ fn change_view(
         return;
     }
 
-    let slowards = if keyboard_input.pressed(KeyCode::Down) {
+    let slowards = if keyboard_input.pressed(KeyCode::ArrowDown) {
         Some(true)
-    } else if keyboard_input.pressed(KeyCode::Up) {
+    } else if keyboard_input.pressed(KeyCode::ArrowUp) {
         Some(false)
     } else {
         None
@@ -332,23 +332,22 @@ fn change_view(
     if let Some(slowards) = slowards {
         let new_step = view_state.checkpoint_stepsize as i64 + (if slowards { -1 } else { 1 });
         view_state.checkpoint_stepsize = if new_step >= 1 { new_step as usize } else { 1 };
-        return;
     }
 }
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "ricsek_view", about = "View a run results...")]
+#[derive(Debug, clap::Parser)]
+#[command(name = "ricsek_view", about = "View a run results...")]
 struct ViewCli {
-    #[structopt(short = "w", long = "window-size", default_value = "800.0")]
+    #[arg(short = 'w', long = "window-size", default_value = "800.0")]
     pub window_size: f64,
 
-    #[structopt(short = "r", long = "run_id")]
+    #[arg(short = 'r', long = "run_id")]
     pub run_id: Option<usize>,
 }
 
 fn main() {
     env_logger::init();
-    let args = ViewCli::from_args();
+    let args = ViewCli::parse();
 
     let conn = &mut ricsek::db::establish_connection();
 
@@ -371,15 +370,15 @@ fn main() {
     info!("Got {} sim-states", sim_states.len());
 
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins((
-            LogDiagnosticsPlugin::default(),
-            FrameTimeDiagnosticsPlugin::default(),
-        ))
+        .add_plugins(DefaultPlugins.set(bevy::log::LogPlugin {
+            level: bevy::log::Level::DEBUG,
+            ..default()
+        }))
+        .add_plugins((LogDiagnosticsPlugin::default(), FrameTimeDiagnosticsPlugin))
         .insert_resource(env)
         .insert_resource(SimStates(sim_states))
         .insert_resource(SetupConfigRes(setup))
-        .insert_resource(FlowViewState::new())
+        .insert_resource(FlowViewState::default())
         .insert_resource(SimViewState::default())
         .add_systems(Startup, add_camera)
         .add_systems(Startup, add_axis_arrows)
@@ -394,17 +393,17 @@ fn main() {
                 update_agent_points,
                 update_agent_orientations,
                 update_flow_markers,
-                change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
+                update_timestep.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
             ),
         )
         .add_systems(
             PostUpdate,
             (
                 flow::update_flow,
-                flow::change_view.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
+                flow::update_flow_markers.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
             ),
         )
-        .add_systems(Update, bevy::window::close_on_esc)
+        .add_systems(Update, common::close_on_esc)
         .run();
 
     info!("Done!");

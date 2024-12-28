@@ -2,8 +2,8 @@ parameters:
   type: Physical
   dt: 0.001
   boundaries:
-    - l: 40
-      closed: true
+    - l: 100
+      closed: false
     - l: 100
       closed: false
     - l: 100
@@ -36,7 +36,7 @@ agent_initialization:
   #   volume_number_density: 0.01e17
   - type: Explicit
     agents:
-      - r: [15.0, 0.0, 0.0]
+      - r: [45.0, 0.0, 0.0]
         u: [0.0, 1.0, 0.0]
       # - r: [+9.0, +0.0   ,  +0.0   ]
       #   u: [-1.0   , +0.0   ,  +0.0   ]

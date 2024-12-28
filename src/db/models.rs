@@ -8,6 +8,7 @@ pub struct Env {
     pub run_id: i32,
     pub step: i32,
     pub t: f64,
+    pub rng: serde_json::Value,
     pub step_summary: Option<serde_json::Value>,
 }
 

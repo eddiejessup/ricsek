@@ -1,13 +1,12 @@
 use nalgebra::{Rotation3, UnitVector3, Vector3};
-use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Normal, Uniform};
 
 pub fn brownian_distr(d_diff: f64, dt: f64) -> Normal<f64> {
     Normal::new(0.0, (2.0 * d_diff * dt).sqrt()).unwrap()
 }
 
-pub fn random_rotation(
-    rng: &mut ThreadRng,
+pub fn random_rotation<R: rand::Rng>(
+    rng: &mut R,
     uniform_theta: &Uniform<f64>,
     uniform_cos_phi: &Uniform<f64>,
     normal_distribution: &Normal<f64>,

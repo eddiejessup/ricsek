@@ -1,4 +1,4 @@
-use nalgebra::{Point3, Vector3, UnitVector3};
+use nalgebra::{Point3, UnitVector3, Vector3};
 
 use crate::{geometry::closest::Closest, state::Agent};
 
@@ -47,10 +47,17 @@ impl BoundaryConfig {
 
         let seg_overlap = -bound_to_seg.dot(&normal);
 
-        (subject_point, UnitVector3::new_normalize(normal), seg_overlap)
+        (
+            subject_point,
+            UnitVector3::new_normalize(normal),
+            seg_overlap,
+        )
     }
 
-    pub fn agent_closest_points_on_boundaries(&self, a: &Agent) -> Vec<(Point3<f64>, UnitVector3<f64>, f64)> {
+    pub fn agent_closest_points_on_boundaries(
+        &self,
+        a: &Agent,
+    ) -> Vec<(Point3<f64>, UnitVector3<f64>, f64)> {
         self.0
             .iter()
             .enumerate()

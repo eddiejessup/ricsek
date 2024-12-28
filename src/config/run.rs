@@ -1,8 +1,11 @@
 use nalgebra::Point3;
 
 use crate::{
-    cuda::{self},
     geometry::point::ObjectPoint,
+    numerics::{
+        self,
+        interface::{ElectroContextTrait, FluidContextTrait},
+    },
 };
 
 use super::setup::parameters::simulation::SimParams;
@@ -14,9 +17,9 @@ pub struct RunParams {
 }
 
 pub struct RunContext {
-    pub gpu_fluid_agent_context: cuda::fluid::CudaFluidContext,
-    pub gpu_fluid_sample_context: cuda::fluid::CudaFluidContext,
-    pub gpu_electro_context: cuda::electro::CudaElectroContext,
+    pub fluid_agent_context: numerics::interface::FluidContext,
+    pub fluid_sample_context: numerics::interface::FluidContext,
+    pub electro_context: numerics::interface::ElectroContext,
     pub sample_eval_points: Vec<ObjectPoint>,
 }
 
@@ -26,19 +29,19 @@ impl RunContext {
         let n_singularities_per_agent = 12; // TODO: Assume some number of singularities per agent for now.
         let n_singularities = n_singularities_per_agent * n_agents as u32;
 
-        let gpu_fluid_agent_context = cuda::fluid::CudaFluidContext::new(
+        let fluid_agent_context = numerics::interface::FluidContext::new(
             n_agents as u32,
             n_singularities,
             &sim_params.boundaries,
             32,
         );
-        let gpu_fluid_sample_context = cuda::fluid::CudaFluidContext::new(
+        let fluid_sample_context = numerics::interface::FluidContext::new(
             sample_points.len() as u32,
             n_singularities,
             &sim_params.boundaries,
             32,
         );
-        let gpu_electro_context = cuda::electro::CudaElectroContext::new(
+        let electro_context = numerics::interface::ElectroContext::new(
             n_agents as u32,
             &sim_params.boundaries,
             sim_params.agent_radius as f32,
@@ -48,12 +51,12 @@ impl RunContext {
         );
 
         RunContext {
-            gpu_fluid_agent_context,
-            gpu_fluid_sample_context,
-            gpu_electro_context,
+            fluid_agent_context,
+            fluid_sample_context,
+            electro_context,
             sample_eval_points: sample_points
                 .iter()
-                .map(|p| ObjectPoint::point_object(std::u32::MAX, *p))
+                .map(|p| ObjectPoint::point_object(u32::MAX, *p))
                 .collect(),
         }
     }

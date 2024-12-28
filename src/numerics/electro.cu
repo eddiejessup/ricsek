@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <cuda_ricsek.h>
-#include <common.cu>
+#include "cuda_interface.h"
+#include "cuda_common.h"
 
 __constant__ BoundaryConfig d_bc;
 __constant__ float d_radius;
