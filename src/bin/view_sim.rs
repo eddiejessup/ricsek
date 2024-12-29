@@ -11,7 +11,10 @@ use clap::Parser;
 use nalgebra::Vector3;
 use num_traits::zero;
 use ricsek::{
-    config::{run::RunContext, setup::SetupConfig},
+    config::{
+        run::RunContext,
+        setup::{parameters::singularities::SingularityParams, SetupConfig},
+    },
     dynamics::run_steps,
     state::{SimStateWithSummary, StepSummary},
     view::{
@@ -135,7 +138,10 @@ enum AgentBodyComponent {
 struct SimUIText;
 
 #[derive(Component)]
-struct ForceMarker(pub Vector3<f64>);
+struct ForceMarker;
+
+#[derive(Component)]
+struct ForceArrow;
 
 #[derive(Component)]
 pub struct SimFlowMarkerId(pub usize);
@@ -407,57 +413,77 @@ fn update_sim_flow_markers(
         }
     }
 }
-// // Forces.
-// fn add_forces(mut commands: Commands) {
-//     // We don't know how many singularities there will be, so just add a bunch of empty entities.
-//     commands.spawn_batch(
-//         [0..1000]
-//             .iter()
-//             .map(|_i| {
-//                 (
-//                     Mesh3d::from(sphere_mesh.clone()),
-//                     MeshMaterial3d(red.clone()),
-//                     Transform::default(),
-//                     Visibility::Hidden,
-//                     ForceMarker(zero()),
-//                 )
-//             })
-//             .collect::<Vec<_>>(),
-//     );
-// }
+// Forces.
+fn add_forces(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // We don't know how many singularities there will be, so just add a bunch of empty entities.
+    for _ in 0..1000 {
+        commands
+            .spawn((ForceMarker, Transform::default(), Visibility::Hidden))
+            .with_children(|marker_parent| {
+                marker_parent
+                    .spawn((ForceArrow, Transform::default(), Visibility::default()))
+                    .with_children(|arrow_parent| {
+                        let arrow_material: Handle<StandardMaterial> = materials.add(
+                            StandardMaterial::from(Color::from(css::RED).with_alpha(0.9)),
+                        );
+                        common::spawn_arrow(arrow_parent, &mut meshes, arrow_material);
+                    });
+            });
+    }
+}
 
-// fn update_forces(
-//     active_sim_state: Res<ActiveSimStateWithSummaryRes>,
-//     mut q_force: Query<(&mut ForceMarker, &mut Transform, &mut Visibility)>,
-// ) {
-//     let cur_sim_state = &active_sim_state.0.sim_state;
+fn update_forces(
+    view_state: Res<SimViewState>,
+    mut q_force_marker: Query<(&mut Transform, &mut Visibility, &Children), With<ForceMarker>>,
+    mut q_force_arrow: Query<(&mut Transform, &mut Visibility), (With<ForceArrow>, Without<ForceMarker>)>,
+) {
+    if let Some(ss) = &view_state.active_state().step_summary {
+        let singularities = &ss.singularities;
+        // Go over all force markers, and set them to represent the singularity.
+        // If we don't have enough, just ignore the rest.
+        // If there are fewer singularities than force markers, hide the rest.
+        for (marker_i, (mut marker_transform, mut marker_visibility, children)) in
+            &mut q_force_marker.iter_mut().enumerate()
+        {
+            if marker_i < singularities.len() {
+                let singularity = &singularities[marker_i];
+                *marker_transform =
+                    Transform::from_translation(point3_to_gvec3(&singularity.0.position));
+                *marker_visibility = Visibility::Inherited;
 
-//     if let Some(ss) = active_sim_state.0.step_summary {
-//         let singularities = &ss.singularities;
-//         // Go over all force markers, and set them to represent the singularity.
-//         // If we don't have enough, just ignore the rest.
-//         // If there are fewer singularities than force markers, hide the rest.
-//         for (i, (mut force_marker, mut transform, mut visibility)) in
-//             &mut q_force.iter_mut().enumerate()
-//         {
-//             if i < singularities.len() {
-//                 let s = &singularities[i];
-//                 match s.1 {
-//                     SingularityParams::Stokeslet { a } => {
-//                         *force_marker = ForceMarker(a);
-//                     }
-//                     _ => {
-//                         panic!("Unsupported singularity type");
-//                     }
-//                 }
-//                 transform.translation = point3_to_gvec3(&s.0.position);
-//                 *visibility = Visibility::Inherited;
-//             } else {
-//                 *visibility = Visibility::Hidden;
-//             }
-//         }
-//     }
-// }
+                // Now update the arrow to point in the direction of the force.
+                let force_vector = match &singularity.1 {
+                    SingularityParams::Stokeslet { a } => a,
+                    _ => {
+                        panic!("Unsupported singularity type");
+                    }
+                };
+
+                for &marker_child in children.iter() {
+                    let (mut arrow_transform, mut arrow_visibility) =
+                        match q_force_arrow.get_mut(marker_child) {
+                            Ok(x) => x,
+                            Err(_) => continue,
+                        };
+
+                    info!("Setting singularity force arrow to {:?}", force_vector);
+                    flow::set_rot_and_viz(
+                        &mut arrow_transform,
+                        &mut arrow_visibility,
+                        &force_vector,
+                        1e-2,
+                    );
+                }
+            } else {
+                *marker_visibility = Visibility::Hidden;
+            }
+        }
+    }
+}
 
 fn update_sim_state(
     keyboard_input: Res<ButtonInput<KeyCode>>,
@@ -550,7 +576,7 @@ fn main() {
                 add_sim_ui,
                 add_axis_arrows,
                 add_agents,
-                // add_forces,
+                add_forces,
                 add_sim_flow_markers,
                 environment::add_boundaries,
             ),
@@ -572,7 +598,7 @@ fn main() {
             (
                 flow::update_flow_vectors,
                 update_sim_ui,
-                // update_forces,
+                update_forces,
                 flow::update_flow_view_state.run_if(on_timer(Duration::from_secs_f64(TIME_STEP))),
             ),
         )

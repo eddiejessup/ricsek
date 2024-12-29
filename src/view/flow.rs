@@ -75,6 +75,32 @@ pub fn add_flow_vectors(
     info!("Added {} flow vector sets.", n_vsets);
 }
 
+pub fn set_rot_and_viz(
+    transform: &mut Transform,
+    visibility: &mut Visibility,
+    v: &Vector3<f64>,
+    min_arrow_length: f64,
+) {
+    match vec3_to_gvec3(&v).try_normalize() {
+        Some(glam_u) => {
+          let arrow_length = v.magnitude();
+          if arrow_length > min_arrow_length {
+                *visibility = Visibility::Inherited;
+                *transform = Transform::from_scale(Vec3::splat(arrow_length as f32))
+                    .looking_to(glam_u, Vec3::Z);
+            } else {
+                trace!("Hiding flow vector because it is too small: {} <= {}", arrow_length, min_arrow_length);
+                *visibility = Visibility::Hidden;
+            }
+        }
+        None => {
+          trace!("Hiding flow vector because it is zero.");
+          *visibility = Visibility::Hidden;
+        }
+    }
+}
+
+
 pub fn update_flow_vectors(
     flow_view_state: Res<FlowViewState>,
     q_vectorset: Query<(&VectorSet, &Children)>,
@@ -130,10 +156,6 @@ pub fn update_flow_vectors(
 
         // Set the scale of the arrow somewhere between 0 and env.arrow_length based on mag_scale value.
         let arrow_length = mag_scale * flow_view_state.max_arrow_length;
-        // info!(
-        //     "Magnitude scale: {}, Max arrow length: {}, Arrow scale: {}",
-        //     mag_scale, flow_view_state.max_arrow_length, arrow_length
-        // );
 
         for &vset_child in vset_children.iter() {
             let (mut transform, mut visibility) = match q_flow_vectors.get_mut(vset_child) {
@@ -141,34 +163,13 @@ pub fn update_flow_vectors(
                 Err(_) => continue,
             };
 
-            // If the flow vector is too small, hide it.
-            *visibility = if mag_scale < flow_view_state.threshold {
-                // warn!(
-                //     "Flow vector is below threshold {}, hiding it.",
-                //     flow_view_state.threshold
-                // );
-                Visibility::Hidden
-            } else {
-                Visibility::Visible
-            };
+            // Threshold hides vectors that are much smaller than the largest vector seen,
+            // The absolute threshold hides small vectors, regardless of their relative size.
+            let min_arrow_length = (flow_view_state.threshold * flow_view_state.max_arrow_length).max(1e-2);
 
             // Set the orientation of the overall flow-vector.
-            match vec3_to_gvec3(&v).try_normalize() {
-                Some(glam_u) => {
-                    if arrow_length > 1e-2 {
-                        // debug!("Setting arrow length to {}", arrow_length);
-                        *transform = Transform::from_scale(Vec3::splat(arrow_length as f32))
-                            .looking_to(glam_u, Vec3::Z)
-                    } else {
-                        // warn!("Arrow length is very small, hiding it.");
-                        *visibility = Visibility::Hidden;
-                    }
-                }
-                None => {
-                    *visibility = Visibility::Hidden;
-                    // warn!("Flow vector is zero, hiding it.");
-                }
-            };
+            let arrow_v = v.normalize().scale(arrow_length);
+            set_rot_and_viz(&mut transform, &mut visibility, &arrow_v, min_arrow_length);
         }
 
         n_markers += 1;
