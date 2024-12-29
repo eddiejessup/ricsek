@@ -41,10 +41,13 @@ fn main() {
 
         let setup_config = ricsek::db::read_run(conn, run_id);
 
-        let sim_state = ricsek::db::read_latest_checkpoint(conn, run_id);
-        info!("Resuming from step {}, t={}s", sim_state.step, sim_state.t);
+        let sim_state_with_summary = ricsek::db::read_latest_checkpoint(conn, run_id);
+        info!(
+            "Resuming from step {}, t={}s",
+            sim_state_with_summary.sim_state.step, sim_state_with_summary.sim_state.t
+        );
 
-        (run_id, setup_config, sim_state)
+        (run_id, setup_config, sim_state_with_summary.sim_state)
     } else {
         info!("Initializing new run");
 
@@ -71,7 +74,7 @@ fn main() {
         let run_id = ricsek::db::initialize_run(conn, &setup_config);
         info!("Initialized run ID {}", run_id);
 
-        ricsek::db::write_checkpoint(conn, run_id, &sim_state, None).unwrap();
+        ricsek::db::write_checkpoint(conn, run_id, &sim_state, &None).unwrap();
 
         (run_id, setup_config, sim_state)
     };

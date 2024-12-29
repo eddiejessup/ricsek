@@ -1,18 +1,9 @@
 use bevy::{color::palettes::css, prelude::*, render::view::visibility::Visibility};
 use nalgebra::Vector3;
 
-use crate::view::common::vec3_to_gvec3;
+use super::common::*;
 
-use super::common::spawn_arrow;
-
-#[derive(Component, Clone)]
-pub struct VectorLabel(pub String);
-
-#[derive(Component, Clone)]
-pub struct VectorSet(pub Vec<(VectorLabel, Vector3<f64>)>);
-
-#[derive(Component)]
-pub struct FlowVector;
+// Resources.
 
 #[derive(Resource)]
 pub struct FlowViewState {
@@ -31,30 +22,36 @@ impl Default for FlowViewState {
     }
 }
 
+// Components.
+
+#[derive(Component, Clone)]
+pub struct VectorSet(pub Vec<(String, Vector3<f64>)>);
+
+#[derive(Component)]
+pub struct FlowVector;
+
+#[derive(Component)]
+pub struct FlowVectorText;
+
 // Spawn flow vectors as children of each marker.
-pub fn add_flow(
+pub fn add_flow_vectors(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     q_vsets: Query<Entity, With<VectorSet>>,
 ) {
-    commands.spawn((
-        Text::new("Initial flow vectors"),
+    let text_style = (
         TextFont {
             font: asset_server.load("fonts/Inconsolata-Regular.ttf"),
             font_size: 40.0,
             ..default()
         },
-        // TextLayout::new_with_justify(JustifyText::Center),
-        // Node {
-        //   position_type: PositionType::Absolute,
-        //   bottom: Val::Px(5.0),
-        //   right: Val::Px(5.0),
-        //   ..default()
-        // },
         TextColor(Color::from(css::PURPLE)),
-    ));
+    );
+    commands
+        .spawn((Text::new("Flow vectors: "), text_style.clone()))
+        .with_child((TextSpan::new("Unknown"), FlowVectorText, text_style.clone()));
 
     let mut n_vsets = 0;
     for vset_entity in q_vsets.iter() {
@@ -78,17 +75,17 @@ pub fn add_flow(
     info!("Added {} flow vector sets.", n_vsets);
 }
 
-pub fn update_flow(
+pub fn update_flow_vectors(
     flow_view_state: Res<FlowViewState>,
     q_vectorset: Query<(&VectorSet, &Children)>,
     mut q_flow_vectors: Query<(&mut Transform, &mut Visibility), With<FlowVector>>,
-    mut q_text: Query<&mut Text>,
+    mut q_text: Query<&mut TextSpan, With<FlowVectorText>>,
 ) {
-    let net_vs_and_labels: Vec<(Vec<VectorLabel>, Vector3<f64>)> = q_vectorset
+    let net_vs_and_labels: Vec<(Vec<String>, Vector3<f64>)> = q_vectorset
         .iter()
         .map(|(vset, _children)| {
             // Keep the set of vectors that are enabled according to flow_view_state.
-            let vset_enabled: Vec<(VectorLabel, Vector3<f64>)> = vset
+            let vset_enabled: Vec<(String, Vector3<f64>)> = vset
                 .0
                 .iter()
                 .enumerate()
@@ -111,18 +108,14 @@ pub fn update_flow(
         })
         .collect();
 
-    let mut text = q_text.get_single_mut().unwrap();
-    text.0 = format!(
-        "Flow vector: {}",
-        match net_vs_and_labels.first() {
-            Some((labels, _)) => labels
-                .iter()
-                .map(|s| s.clone().0)
-                .collect::<Vec<String>>()
-                .join(", "),
-            None => "None".to_string(),
-        }
-    );
+    q_text.single_mut().0 = match net_vs_and_labels.first() {
+        Some((labels, _)) => labels
+            .iter()
+            .map(|s| s.clone())
+            .collect::<Vec<String>>()
+            .join(", "),
+        None => "None".to_string(),
+    };
 
     let v_max_scale = 1.0;
 
@@ -183,7 +176,10 @@ pub fn update_flow(
     info!("Updated {} flow vectors.", n_markers);
 }
 
-pub fn update_flow_markers(keys: Res<ButtonInput<KeyCode>>, mut view_state: ResMut<FlowViewState>) {
+pub fn update_flow_view_state(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut view_state: ResMut<FlowViewState>,
+) {
     let entries = [
         (KeyCode::Digit1, 0),
         (KeyCode::Digit2, 1),

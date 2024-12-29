@@ -1,11 +1,20 @@
 use std::f32::consts::FRAC_PI_2;
 
-use crate::geometry::cone::Cone;
+use crate::{config::setup::SetupConfig, geometry::cone::Cone};
 use bevy::{
     color::palettes::css::{self},
     prelude::*,
 };
 use nalgebra::{Point3, Vector3};
+
+pub const F_COEFF: f64 = 1e6;
+pub const TORQUE_COEFF: f64 = 1e6;
+pub const V_COEFF: f64 = 1e-1;
+
+// Resources.
+
+#[derive(Resource)]
+pub struct SetupConfigRes(pub SetupConfig);
 
 pub fn close_on_esc(
     mut commands: Commands,

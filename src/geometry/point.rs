@@ -2,7 +2,7 @@ use nalgebra::{Point3, UnitVector2, UnitVector3, Vector3};
 use rand::distributions::Distribution;
 use rand_distr::StandardNormal;
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct ObjectPoint {
     pub object_id: u32,
     pub position: Point3<f64>,

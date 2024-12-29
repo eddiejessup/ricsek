@@ -1,4 +1,7 @@
-use crate::geometry::line_segment::LineSegment;
+use crate::{
+    config::setup::parameters::singularities::SingularityParams,
+    geometry::{line_segment::LineSegment, point::ObjectPoint},
+};
 use log::debug;
 use nalgebra::{Point3, UnitVector3, Vector3};
 use rand::prelude::*;
@@ -67,4 +70,30 @@ impl Agent {
         );
         d.normalize().scale(k * displacement)
     }
+}
+
+// A step summary is a summary of what happened or was computed during a single step.
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct AgentStepSummary {
+    pub f_agent_electro: Vector3<f64>,
+    pub torque_agent_electro: Vector3<f64>,
+    pub f_propulsion: Vector3<f64>,
+    pub f_boundary_electro: Vector3<f64>,
+    pub torque_boundary_electro: Vector3<f64>,
+    pub v_fluid: Vector3<f64>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct StepSummary {
+    pub agent_summaries: Vec<AgentStepSummary>,
+    pub singularities: Vec<(ObjectPoint, SingularityParams)>,
+    pub fluid_flow: Vec<Vector3<f64>>,
+}
+
+#[derive(Clone)]
+pub struct SimStateWithSummary {
+    pub sim_state: SimState,
+    // Optional because we might not compute a summary, especially for the initial state.
+    pub step_summary: Option<StepSummary>,
 }

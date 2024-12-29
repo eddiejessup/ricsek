@@ -24,7 +24,7 @@ pub struct Marker {
 pub struct MarkerSet(pub Vec<Marker>);
 
 #[derive(Resource)]
-pub struct SingularitySet(pub Vec<(flow::VectorLabel, Singularity)>);
+pub struct SingularitySet(pub Vec<(String, Singularity)>);
 
 // Helper to add markers just there to hold a vector-set.
 pub fn add_flow_markers(
@@ -72,7 +72,7 @@ fn stokeslet_image(
     p: Point3<f64>,
     d: Vector3<f64>,
     stokeslet_force: Vector3<f64>,
-) -> Vec<(flow::VectorLabel, Singularity)> {
+) -> Vec<(String, Singularity)> {
     let d_direction = d.normalize();
     let h = d.norm();
 
@@ -134,7 +134,7 @@ fn stokeslet_image(
     .iter()
     .map(|(params, label)| {
         (
-            flow::VectorLabel(String::from(*label)),
+            String::from(*label),
             Singularity {
                 point: p + 2.0 * d,
                 params: params.clone(),
@@ -194,8 +194,8 @@ fn main() {
     };
     let d = Vector3::new(0.0, 0.0, bc.0.z.l_half() - stokeslet_origin_point.z);
 
-    let mut singularities: Vec<(flow::VectorLabel, Singularity)> =
-        vec![(flow::VectorLabel(String::from("Origin")), stokeslet_origin)];
+    let mut singularities: Vec<(String, Singularity)> =
+        vec![("Origin".to_string(), stokeslet_origin)];
 
     singularities.extend(stokeslet_image(stokeslet_origin_point, d, stokeslet_force));
 

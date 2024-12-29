@@ -1,7 +1,6 @@
 use crate::config::setup::SetupConfig;
-use crate::dynamics::StepSummary;
 use crate::geometry::line_segment::LineSegment;
-use crate::state::*;
+use crate::state::{self};
 use diesel::dsl::Eq;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -44,8 +43,8 @@ pub fn initialize_run(conn: &mut PgConnection, config: &SetupConfig) -> usize {
 pub fn write_checkpoint(
     conn: &mut PgConnection,
     rid: usize,
-    sim_state: &SimState,
-    summary: Option<StepSummary>,
+    sim_state: &state::SimState,
+    summary: &Option<state::StepSummary>,
 ) -> Result<i32, Error> {
     use crate::db::schema::env::dsl;
 
@@ -125,7 +124,16 @@ pub fn read_run_envs(conn: &mut PgConnection, rid: usize) -> Vec<models::Env> {
         .unwrap()
 }
 
-pub fn read_agents(conn: &mut PgConnection, env_id_: i32) -> Vec<Agent> {
+pub fn read_last_run_env(conn: &mut PgConnection, rid: usize) -> models::Env {
+    use schema::env::dsl;
+    dsl::env
+        .filter(dsl::run_id.eq(rid as i32))
+        .order(dsl::step.asc())
+        .first(conn)
+        .unwrap()
+}
+
+pub fn read_agents(conn: &mut PgConnection, env_id_: i32) -> Vec<state::Agent> {
     use schema::agent::dsl;
 
     let agent_vals: Vec<models::Agent> = dsl::agent
@@ -136,7 +144,7 @@ pub fn read_agents(conn: &mut PgConnection, env_id_: i32) -> Vec<Agent> {
 
     agent_vals
         .iter()
-        .map(|a| Agent {
+        .map(|a| state::Agent {
             seg: LineSegment {
                 start: Point3::new(a.r1x, a.r1y, a.r1z),
                 end: Point3::new(a.r2x, a.r2y, a.r2z),
@@ -147,39 +155,38 @@ pub fn read_agents(conn: &mut PgConnection, env_id_: i32) -> Vec<Agent> {
         .collect()
 }
 
-pub fn env_to_sim_state(
+pub fn env_to_sim_state_with_summary(
     conn: &mut PgConnection,
     env: &models::Env,
-) -> (SimState, Option<StepSummary>) {
-    let agents: Vec<Agent> = read_agents(conn, env.id);
+) -> state::SimStateWithSummary {
+    let agents: Vec<state::Agent> = read_agents(conn, env.id);
 
-    let sim_state = SimState {
+    let sim_state = state::SimState {
         step: env.step as usize,
         t: env.t,
         agents,
         rng: serde_json::from_value(env.rng.clone()).unwrap(),
     };
 
-    let step_summary: Option<StepSummary> = env
+    let step_summary: Option<state::StepSummary> = env
         .step_summary
         .as_ref()
         .map(|v| serde_json::from_value(v.clone()).unwrap());
 
-    (sim_state, step_summary)
+    state::SimStateWithSummary {
+        sim_state,
+        step_summary,
+    }
 }
 
-pub fn read_run_sim_states(
-    conn: &mut PgConnection,
-    rid: usize,
-) -> Vec<(SimState, Option<StepSummary>)> {
+pub fn read_run_sim_states(conn: &mut PgConnection, rid: usize) -> Vec<state::SimStateWithSummary> {
     read_run_envs(conn, rid)
         .into_iter()
-        .map(|env| env_to_sim_state(conn, &env))
+        .map(|env| env_to_sim_state_with_summary(conn, &env))
         .collect()
 }
 
-pub fn read_latest_checkpoint(conn: &mut PgConnection, rid: usize) -> SimState {
-    let envs = read_run_envs(conn, rid);
-    let latest_env = envs.last().unwrap();
-    env_to_sim_state(conn, latest_env).0
+pub fn read_latest_checkpoint(conn: &mut PgConnection, rid: usize) -> state::SimStateWithSummary {
+    let latest_env = read_last_run_env(conn, rid);
+    env_to_sim_state_with_summary(conn, &latest_env)
 }
