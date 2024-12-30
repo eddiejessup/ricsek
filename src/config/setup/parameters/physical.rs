@@ -2,11 +2,10 @@ use std::f64::consts::PI;
 
 use nalgebra::{Point3, Vector3};
 
-use crate::geometry::{capsule::Capsule, line_segment::LineSegment};
+use crate::geometry::{capsule::Capsule, helix::Helix, line_segment::LineSegment};
 
 use super::{common::BoundaryConfig, simulation::SimParams};
 
-// Derive JSON deserialize for PhysicalParams.
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct PhysicalParams {
     // Time step.
@@ -34,6 +33,9 @@ pub struct PhysicalParams {
     pub agent_propulsion_force: f64,
     pub agent_propulsion_torque: f64,
     pub enable_agent_propulsion: bool,
+    pub agent_tail: Option<Helix>,
+    pub agent_tail_rotation_rate: f64,
+    pub agent_tail_n_points: usize,
 }
 
 impl PhysicalParams {
@@ -130,6 +132,9 @@ impl PhysicalParams {
             enable_agent_propulsion: self.enable_agent_propulsion,
             enable_agent_agent_electro: self.enable_agent_agent_electro,
             enable_agent_boundary_electro: self.enable_agent_boundary_electro,
+            agent_tail: self.agent_tail.clone(),
+            agent_tail_rotation_rate: self.agent_tail_rotation_rate,
+            agent_tail_n_points: self.agent_tail_n_points,
         }
     }
 }

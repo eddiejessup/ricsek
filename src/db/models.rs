@@ -22,8 +22,7 @@ pub struct Agent {
     pub r2x: f64,
     pub r2y: f64,
     pub r2z: f64,
-    pub th1: f64,
-    pub th2: f64,
+    pub tail_phase: f64,
 }
 
 #[derive(Queryable)]

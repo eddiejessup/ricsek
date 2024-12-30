@@ -6,7 +6,7 @@ pub mod electro;
 pub mod fluid;
 pub mod stokes_solutions;
 
-use std::f64::consts::PI;
+use std::f64::consts::{PI, TAU};
 
 use crate::config::run::{RunContext, RunParams};
 use crate::config::setup::parameters::simulation::SimParams;
@@ -162,6 +162,8 @@ pub fn update(
         );
 
         agent.seg.rotate(rot_rotational_diffusion * rot_object);
+        agent.tail_phase += sim_params.agent_tail_rotational_velocity() * sim_params.dt;
+        agent.tail_phase = agent.tail_phase.rem_euclid(TAU);
 
         // Apply periodic boundary condition.
         boundary::wrap_agent_inplace(agent, &sim_params.boundaries);

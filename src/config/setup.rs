@@ -1,12 +1,17 @@
 pub mod agents;
 pub mod parameters;
 
+use rand::prelude::*;
 use std::{error::Error, fs::File, io::Read, path::Path};
 
 use log::info;
 use nalgebra::Point3;
+use rand_pcg::Pcg64Mcg;
 
-use crate::geometry::{grid_2d, grid_3d};
+use crate::{
+    geometry::{grid_2d, grid_3d},
+    state,
+};
 
 use self::{agents::AgentInitializationConfig, parameters::simulation::SimParams};
 
@@ -101,4 +106,28 @@ Simulation parameters:
             t_cross = self.parameters.boundaries.l() / self.parameters.agent_propulsion_speed(),
         );
     }
+}
+
+pub fn initialize_run() -> (SetupConfig, state::SimState) {
+    let setup_config = SetupConfig::parse("config.yaml").unwrap();
+    setup_config.print();
+
+    let mut rng = Pcg64Mcg::from_entropy();
+    let agents: Vec<state::Agent> = setup_config
+        .agent_initialization
+        .iter()
+        .flat_map(|init_config| {
+            agents::initialize_agents(
+                &mut rng,
+                init_config.clone(),
+                setup_config.parameters.boundaries.l(),
+                setup_config.parameters.agent_inter_sphere_length,
+            )
+        })
+        .collect();
+    info!("Initialized {} agents", agents.len());
+
+    let sim_state = state::SimState::new(agents, rng);
+
+    (setup_config, sim_state)
 }

@@ -1,3 +1,7 @@
+use std::f64::consts::TAU;
+
+use crate::geometry::helix::Helix;
+
 use super::common::BoundaryConfig;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -17,6 +21,10 @@ pub struct SimParams {
     pub agent_propulsion_force: f64,
     pub agent_translational_mobility: f64,
     pub agent_rotational_mobility: f64,
+    // Helix-style propulsion.
+    pub agent_tail: Option<Helix>,
+    pub agent_tail_rotation_rate: f64,
+    pub agent_tail_n_points: usize,
     //   Strength of the bacterium's force on the fluid as transmitted through
     //   the fluid. i.e. this depends on the fluid's viscosity. Not physically
     //   independent, but can be in simulation terms.
@@ -39,5 +47,9 @@ impl SimParams {
 
     pub fn agent_propulsion_speed(&self) -> f64 {
         self.agent_propulsion_force * self.agent_translational_mobility
+    }
+
+    pub fn agent_tail_rotational_velocity(&self) -> f64 {
+        self.agent_tail_rotation_rate * TAU
     }
 }

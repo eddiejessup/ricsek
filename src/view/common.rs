@@ -62,13 +62,13 @@ pub fn spawn_arrow(
 ) {
     let transform_mesh = Transform::from_rotation(Quat::from_rotation_x(-FRAC_PI_2));
     let cone: Handle<Mesh> = meshes.add(Cone {
-        radius: 0.5,
+        radius: 0.3,
         height: 0.5,
         segments: 16,
     });
     let cylinder_height = 2.0;
     let cylinder: Handle<Mesh> = meshes.add(
-        Cylinder::new(0.3, cylinder_height)
+        Cylinder::new(0.1, cylinder_height)
             .mesh()
             .resolution(16)
             .build(),

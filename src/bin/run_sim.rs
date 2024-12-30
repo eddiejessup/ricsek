@@ -1,7 +1,9 @@
 use clap::Parser;
 use log::{info, warn};
+use rand::prelude::*;
+use rand_pcg::Pcg64Mcg;
 use ricsek::{
-    config::{self, run::RunParams},
+    config::{self, run::RunParams, setup},
     dynamics::run,
     state::{Agent, SimState},
 };
@@ -51,25 +53,7 @@ fn main() {
     } else {
         info!("Initializing new run");
 
-        let setup_config = config::setup::SetupConfig::parse("config.yaml").unwrap();
-        setup_config.print();
-
-        let mut rng = rand::thread_rng();
-        let agents: Vec<Agent> = setup_config
-            .agent_initialization
-            .iter()
-            .flat_map(|init_config| {
-                config::setup::agents::initialize_agents(
-                    &mut rng,
-                    init_config.clone(),
-                    setup_config.parameters.boundaries.l(),
-                    setup_config.parameters.agent_inter_sphere_length,
-                )
-            })
-            .collect();
-        info!("Initialized {} agents", agents.len());
-
-        let sim_state = SimState::new(agents);
+        let (setup_config, sim_state) = setup::initialize_run();
 
         let run_id = ricsek::db::initialize_run(conn, &setup_config);
         info!("Initialized run ID {}", run_id);

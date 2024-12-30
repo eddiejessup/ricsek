@@ -4,7 +4,6 @@ use crate::{
 };
 use log::debug;
 use nalgebra::{Point3, UnitVector3, Vector3};
-use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
 
 #[derive(Clone)]
@@ -16,12 +15,12 @@ pub struct SimState {
 }
 
 impl SimState {
-    pub fn new(agents: Vec<Agent>) -> SimState {
+    pub fn new(agents: Vec<Agent>, rng: Pcg64Mcg) -> SimState {
         SimState {
             agents,
             t: 0.0,
             step: 0,
-            rng: Pcg64Mcg::from_entropy(),
+            rng,
         }
     }
 }
@@ -29,17 +28,15 @@ impl SimState {
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct Agent {
     pub seg: LineSegment,
-    pub th1: f64,
-    pub th2: f64,
+    pub tail_phase: f64,
 }
 
 impl Agent {
-    pub fn new(r: Point3<f64>, d: Vector3<f64>) -> Self {
+    pub fn new(r: Point3<f64>, d: Vector3<f64>, tail_phase: f64) -> Self {
         debug!("Agent::new(r={}, d={})", 1e6 * r, 1e6 * d);
         Agent {
             seg: LineSegment::new(r, d),
-            th1: 0.0,
-            th2: 0.0,
+            tail_phase,
         }
     }
 

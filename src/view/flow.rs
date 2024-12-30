@@ -83,23 +83,31 @@ pub fn set_rot_and_viz(
 ) {
     match vec3_to_gvec3(&v).try_normalize() {
         Some(glam_u) => {
-          let arrow_length = v.magnitude();
-          if arrow_length > min_arrow_length {
+            let arrow_length = v.magnitude();
+            if arrow_length > min_arrow_length {
                 *visibility = Visibility::Inherited;
-                *transform = Transform::from_scale(Vec3::splat(arrow_length as f32))
-                    .looking_to(glam_u, Vec3::Z);
+                // *transform = Transform::from_scale(Vec3::splat(arrow_length as f32))
+                *transform = Transform::from_scale(Vec3::new(
+                    (arrow_length / 2.0) as f32,
+                    (arrow_length / 2.0) as f32,
+                    arrow_length as f32,
+                ))
+                .looking_to(glam_u, Vec3::Z);
             } else {
-                trace!("Hiding flow vector because it is too small: {} <= {}", arrow_length, min_arrow_length);
+                trace!(
+                    "Hiding flow vector because it is too small: {} <= {}",
+                    arrow_length,
+                    min_arrow_length
+                );
                 *visibility = Visibility::Hidden;
             }
         }
         None => {
-          trace!("Hiding flow vector because it is zero.");
-          *visibility = Visibility::Hidden;
+            trace!("Hiding flow vector because it is zero.");
+            *visibility = Visibility::Hidden;
         }
     }
 }
-
 
 pub fn update_flow_vectors(
     flow_view_state: Res<FlowViewState>,
@@ -165,7 +173,8 @@ pub fn update_flow_vectors(
 
             // Threshold hides vectors that are much smaller than the largest vector seen,
             // The absolute threshold hides small vectors, regardless of their relative size.
-            let min_arrow_length = (flow_view_state.threshold * flow_view_state.max_arrow_length).max(1e-2);
+            let min_arrow_length =
+                (flow_view_state.threshold * flow_view_state.max_arrow_length).max(1e-2);
 
             // Set the orientation of the overall flow-vector.
             let arrow_v = v.normalize().scale(arrow_length);

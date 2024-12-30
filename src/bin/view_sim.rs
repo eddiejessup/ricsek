@@ -8,12 +8,11 @@ use bevy::{
     time::common_conditions::on_timer,
 };
 use clap::Parser;
-use nalgebra::Vector3;
 use num_traits::zero;
 use ricsek::{
     config::{
         run::RunContext,
-        setup::{parameters::singularities::SingularityParams, SetupConfig},
+        setup::{self, parameters::singularities::SingularityParams, SetupConfig},
     },
     dynamics::run_steps,
     state::{SimStateWithSummary, StepSummary},
@@ -54,10 +53,6 @@ impl SimViewState {
 
     pub fn latest_state(&self) -> SimStateWithSummary {
         self.states[self.states.len() - 1].clone()
-    }
-
-    pub fn n_states(&self) -> usize {
-        self.states.len()
     }
 
     pub fn max_i(&self) -> usize {
@@ -420,17 +415,35 @@ fn add_forces(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // We don't know how many singularities there will be, so just add a bunch of empty entities.
+    let marker_material: Handle<StandardMaterial> = materials.add(StandardMaterial::from(
+        Color::from(css::ORANGE).with_alpha(0.4),
+    ));
+    let arrow_material: Handle<StandardMaterial> = materials.add(StandardMaterial::from(
+        Color::from(css::GREEN).with_alpha(0.9),
+    ));
+    let marker_mesh: Handle<Mesh> = meshes.add(
+        Sphere::new(0.1)
+            .mesh()
+            .kind(SphereKind::Uv {
+                sectors: 18,
+                stacks: 9,
+            })
+            .build(),
+    );
     for _ in 0..1000 {
         commands
-            .spawn((ForceMarker, Transform::default(), Visibility::Hidden))
+            .spawn((
+                ForceMarker,
+                Transform::default(),
+                Mesh3d(marker_mesh.clone()),
+                MeshMaterial3d(marker_material.clone()),
+                Visibility::Hidden,
+            ))
             .with_children(|marker_parent| {
                 marker_parent
                     .spawn((ForceArrow, Transform::default(), Visibility::default()))
                     .with_children(|arrow_parent| {
-                        let arrow_material: Handle<StandardMaterial> = materials.add(
-                            StandardMaterial::from(Color::from(css::RED).with_alpha(0.9)),
-                        );
-                        common::spawn_arrow(arrow_parent, &mut meshes, arrow_material);
+                        common::spawn_arrow(arrow_parent, &mut meshes, arrow_material.clone());
                     });
             });
     }
@@ -439,7 +452,10 @@ fn add_forces(
 fn update_forces(
     view_state: Res<SimViewState>,
     mut q_force_marker: Query<(&mut Transform, &mut Visibility, &Children), With<ForceMarker>>,
-    mut q_force_arrow: Query<(&mut Transform, &mut Visibility), (With<ForceArrow>, Without<ForceMarker>)>,
+    mut q_force_arrow: Query<
+        (&mut Transform, &mut Visibility),
+        (With<ForceArrow>, Without<ForceMarker>),
+    >,
 ) {
     if let Some(ss) = &view_state.active_state().step_summary {
         let singularities = &ss.singularities;
@@ -474,8 +490,8 @@ fn update_forces(
                     flow::set_rot_and_viz(
                         &mut arrow_transform,
                         &mut arrow_visibility,
-                        &force_vector,
-                        1e-2,
+                        &force_vector.normalize().scale(0.3),
+                        1e-3,
                     );
                 }
             } else {
@@ -534,28 +550,42 @@ struct ViewCli {
 
     #[arg(short = 'r', long = "run_id")]
     pub run_id: Option<usize>,
+
+    #[arg(short = 'n', long = "new", default_value = "true")]
+    pub new: bool,
 }
 
 fn main() {
     env_logger::init();
     let args = ViewCli::parse();
 
-    let conn = &mut ricsek::db::establish_connection();
-
-    let run_id = match args.run_id {
-        Some(run_id) => run_id,
-        None => {
-            warn!("No run_id specified, using latest run_id");
-            ricsek::db::read_latest_run_id(conn)
-        }
+    let (setup_config, sim_states_with_summaries) = if args.new {
+        info!("Initializing new in-memory run");
+        let (setup_config, sim_state) = setup::initialize_run();
+        (
+            setup_config,
+            vec![SimStateWithSummary {
+                sim_state,
+                step_summary: None,
+            }],
+        )
+    } else {
+        let conn = &mut ricsek::db::establish_connection();
+        let run_id = match args.run_id {
+            Some(run_id) => run_id,
+            None => {
+                warn!("No run_id specified, using latest run_id");
+                ricsek::db::read_latest_run_id(conn)
+            }
+        };
+        warn!("Reading database for run_id: {}", run_id);
+        let setup_config = ricsek::db::read_run(conn, run_id);
+        let sim_states_with_summaries = ricsek::db::read_run_sim_states(conn, run_id);
+        (setup_config, sim_states_with_summaries)
     };
 
-    let setup = ricsek::db::read_run(conn, run_id);
-
-    let sim_states_with_summaries = ricsek::db::read_run_sim_states(conn, run_id);
-
     let env = Environment {
-        boundaries: Some(setup.parameters.boundaries.clone()),
+        boundaries: Some(setup_config.parameters.boundaries.clone()),
     };
 
     info!("Got {} sim-states", sim_states_with_summaries.len());
@@ -568,7 +598,7 @@ fn main() {
         .add_plugins((LogDiagnosticsPlugin::default(), FrameTimeDiagnosticsPlugin))
         .insert_resource(env)
         .insert_resource(FlowViewState::default())
-        .insert_resource(SimViewState::new(setup, sim_states_with_summaries))
+        .insert_resource(SimViewState::new(setup_config, sim_states_with_summaries))
         .add_systems(
             Startup,
             (

@@ -77,8 +77,7 @@ pub fn write_checkpoint(
                     r2x.eq(a.r2().x),
                     r2y.eq(a.r2().y),
                     r2z.eq(a.r2().z),
-                    th1.eq(a.th1),
-                    th2.eq(a.th2),
+                    tail_phase.eq(a.tail_phase),
                 )
             })
             .collect();
@@ -149,8 +148,7 @@ pub fn read_agents(conn: &mut PgConnection, env_id_: i32) -> Vec<state::Agent> {
                 start: Point3::new(a.r1x, a.r1y, a.r1z),
                 end: Point3::new(a.r2x, a.r2y, a.r2z),
             },
-            th1: a.th1,
-            th2: a.th2,
+            tail_phase: a.tail_phase,
         })
         .collect()
 }

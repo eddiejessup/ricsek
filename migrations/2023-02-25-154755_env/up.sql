@@ -19,8 +19,7 @@ CREATE TABLE agent (
     r2x FLOAT NOT NULL,
     r2y FLOAT NOT NULL,
     r2z FLOAT NOT NULL,
-    th1 FLOAT NOT NULL,
-    th2 FLOAT NOT NULL,
+    tail_phase FLOAT NOT NULL,
     PRIMARY KEY (agent_id, env_id)
 );
 

@@ -10,8 +10,7 @@ diesel::table! {
         r2x -> Float8,
         r2y -> Float8,
         r2z -> Float8,
-        th1 -> Float8,
-        th2 -> Float8,
+        tail_phase -> Float8,
     }
 }
 

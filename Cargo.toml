@@ -43,13 +43,10 @@ rand_pcg = { version = "0.3.1", features = ["serde", "serde1"] }
 bindgen = "0.70"
 
 [[bin]]
-name = "run"
+name = "run_sim"
 
 [[bin]]
 name = "view_sim"
-
-[[bin]]
-name = "view_stokes_solutions"
 
 [profile.release]
 debug = 1
