@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{f32::consts::FRAC_PI_2, time::Duration};
 
 use bevy::{
     color::palettes::css,
@@ -8,6 +8,7 @@ use bevy::{
     time::common_conditions::on_timer,
 };
 use clap::Parser;
+use nalgebra::Point3;
 use num_traits::zero;
 use ricsek::{
     config::{
@@ -124,8 +125,8 @@ struct AgentId(pub usize);
 
 #[derive(Component)]
 enum AgentBodyComponent {
-    // Back,
-    // Front,
+    Back,
+    Front,
     Rod,
 }
 
@@ -214,15 +215,15 @@ fn add_agents(
 
     let radius = params.agent_radius;
 
-    let _back_material = materials.add(StandardMaterial::from(
+    let back_material = materials.add(StandardMaterial::from(
         Color::from(css::GREEN).with_alpha(0.9),
     ));
-    let _front_material = materials.add(StandardMaterial::from(
+    let front_material = materials.add(StandardMaterial::from(
         Color::from(css::RED).with_alpha(0.9),
     ));
     let rod_material = materials.add(StandardMaterial::from(Color::BLACK.with_alpha(0.9)));
 
-    let _sphere_mesh = meshes.add(
+    let sphere_mesh = meshes.add(
         Sphere::new(radius as f32)
             .mesh()
             .kind(SphereKind::Uv {
@@ -251,12 +252,36 @@ fn add_agents(
             ))
             .with_children(|parent| {
                 parent.spawn((
-                    // Add cylinder
-                    Mesh3d::from(rod_mesh.clone()),
-                    MeshMaterial3d(rod_material.clone()),
+                    Transform::default(),
+                    Visibility::default(),
                     AgentId(i),
-                    AgentBodyComponent::Rod,
+                    AgentBodyComponent::Back,
+                    Mesh3d::from(sphere_mesh.clone()),
+                    MeshMaterial3d(back_material.clone()),
                 ));
+                parent.spawn((
+                    Transform::default(),
+                    Visibility::default(),
+                    AgentId(i),
+                    AgentBodyComponent::Front,
+                    Mesh3d::from(sphere_mesh.clone()),
+                    MeshMaterial3d(front_material.clone()),
+                ));
+
+                parent
+                    .spawn((
+                        Transform::default(),
+                        Visibility::default(),
+                        AgentId(i),
+                        AgentBodyComponent::Rod,
+                    ))
+                    .with_children(|rod_parent| {
+                        rod_parent.spawn((
+                            Mesh3d::from(rod_mesh.clone()),
+                            MeshMaterial3d(rod_material.clone()),
+                            Transform::from_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
+                        ));
+                    });
             });
     });
 }
@@ -373,14 +398,14 @@ fn update_agent_orientations(
     for (agent_id, mut transform, agent_body) in &mut q_ag {
         let agent = &cur_sim_state.agents[agent_id.0];
         *transform = match agent_body {
-            // AgentBodyComponent::Front => Transform::from_translation(point3_to_gvec3(
-            //     &(Point3::origin() + agent.seg.start_end() * 0.5),
-            // ))
-            // .looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z),
-            // AgentBodyComponent::Back => Transform::from_translation(point3_to_gvec3(
-            //     &(Point3::origin() - agent.seg.start_end() * 0.5),
-            // ))
-            // .looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z),
+            AgentBodyComponent::Front => Transform::from_translation(point3_to_gvec3(
+                &(Point3::origin() + agent.seg.start_end() * 0.5),
+            ))
+            .looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z),
+            AgentBodyComponent::Back => Transform::from_translation(point3_to_gvec3(
+                &(Point3::origin() - agent.seg.start_end() * 0.5),
+            ))
+            .looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z),
             AgentBodyComponent::Rod => {
                 Transform::IDENTITY.looking_to(vec3_to_gvec3(&agent.seg.start_end()), Vec3::Z)
             }
